@@ -63,9 +63,14 @@ public:
             }
             else
             {
+                auto nextCurr = mCurrentBuffer = (mCurrentBuffer+1) % BUFFER_COUNT;
+                if (nextCurr == mCurrentLogBuffer)
+                {
+                    throw std::runtime_error("log buffer overrun pls fix");
+                }
                 mUseSize[mCurrentBuffer] = mCurrentIdx;
                 mCurrentIdx = payloadSize;
-                mCurrentBuffer = (mCurrentBuffer+1) % BUFFER_COUNT;
+                mCurrentBuffer = nextCurr;
                 mLogBufferFlushCv.notify_one();
             }
         }
