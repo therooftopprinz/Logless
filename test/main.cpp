@@ -1,12 +1,21 @@
 #include <Logger.hpp>
 
+void logtask()
+{
+    for (int i=0; i<1024*8; i++)
+    {
+        Logless(1, uint32_t(i), uint16_t(0xffff));
+    }
+}
+
 int main()
 {
-    Logger& logger = Logger::getInstance();
-
-    logger.log(1, uint16_t(42), uint16_t(0xffff));
-    logger.log(1, uint16_t(42), uint16_t(0xffff));
-
-    using namespace std::literals::chrono_literals;
-    std::this_thread::sleep_for(10ms);
+    std::thread a(logtask);
+    std::thread b(logtask);
+    std::thread c(logtask);
+    std::thread d(logtask);
+    a.join();
+    b.join();
+    c.join();
+    d.join();
 }
