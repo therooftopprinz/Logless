@@ -9,6 +9,7 @@
 #include <iomanip>
 #include <thread>
 #include <chrono>
+#include <exception>
 
 template<typename> struct TypeTraits;
 template<> struct TypeTraits<uint8_t>  {static constexpr auto type_id = 0xf1;};
@@ -42,8 +43,8 @@ std::string toHexString(const uint8_t* pData, size_t size)
 class Logger
 {
 public:
-    static constexpr size_t BUFFER_SIZE = 1024;
-    static constexpr size_t BUFFER_COUNT = 1024;
+    static constexpr size_t BUFFER_SIZE = 1024*32;
+    static constexpr size_t BUFFER_COUNT = 512;
 
     template<typename... Ts>
     void log(uint16_t id, const Ts&... ts)
@@ -52,6 +53,7 @@ public:
         uint8_t* usedBuffer;
         int usedIdx = 0;
 
+        // try
         {
             std::unique_lock<std::mutex> lock(mLogBufferMutex);
 
@@ -74,6 +76,11 @@ public:
                 mLogBufferFlushCv.notify_one();
             }
         }
+        // catch(const std::exception& e)
+        // {
+        //     std::cout << "EXCEPTION!!!: " << e.what() << "\n";
+        //     while(1);
+        // }
 
         usedBuffer = mLogBuffer[mCurrentBuffer].data();
         // LOG HEADER
@@ -89,25 +96,29 @@ public:
         return logger;
     }
 
+    void stop()
+    {
+        std::cout << "Logger::~Logger\n";
+        std::unique_lock<std::mutex> lock(mLogBufferMutex);
+        mStop = true;
+        mLogBufferFlushCv.notify_one();
+        lock.unlock();
+        mOutputStream.close();
+        std::cout << "Total bytes logged: " << mLoggedBytes << "\n";
+        while(mRunning);
+    }
+
 private:
 
     Logger()
         : mOutputStream(std::fstream("log.bin", std::ios::binary))
     {
         std::cout << "Logger::Logger\n";
-        mRun = std::thread(&Logger::run, this);
+        std::thread(&Logger::run, this).detach();
     }
 
     ~Logger()
     {
-        std::cout << "Logger::~Logger\n";
-        std::unique_lock<std::mutex> lock(mLogBufferMutex);
-        mRunning = false;
-        lock.unlock();
-        mLogBufferFlushCv.notify_one();
-        mRun.join();
-        mOutputStream.close();
-        std::cout << "Total bytes logged: " << mLoggedBytes << "\n";
     }
 
     void log(uint8_t* pUsedBuffer, int& pUsedIndex)
@@ -129,36 +140,38 @@ private:
     void run()
     {
         mRunning = true;
-        while(mRunning)
+        mStop = false;
+        while(!mStop)
         {
-            std::unique_lock<std::mutex> lock(mLogBufferMutex);
-            mLogBufferFlushCv.wait(lock);
-            lock.unlock();
-
+            {
+                std::unique_lock<std::mutex> lock(mLogBufferMutex);
+                mLogBufferFlushCv.wait(lock, [this](){return mCurrentLogBuffer != mCurrentBuffer || mStop;});
+            }
             while (mCurrentLogBuffer != mCurrentBuffer)
             {
                 mOutputStream.write((char*)mLogBuffer[mCurrentLogBuffer].data(), mUseSize[mCurrentLogBuffer]);
-                std::cout << "logging[" << mUseSize[mCurrentLogBuffer] << "]: @" << (void*)(mLogBuffer[mCurrentLogBuffer].data()) << " "  << toHexString(mLogBuffer[mCurrentLogBuffer].data(), mUseSize[mCurrentLogBuffer]) << "\n";
+                //std::cout << "logging[" << mUseSize[mCurrentLogBuffer] << "]: @" << (void*)(mLogBuffer[mCurrentLogBuffer].data()) << " "  << toHexString(mLogBuffer[mCurrentLogBuffer].data(), mUseSize[mCurrentLogBuffer]) << "\n";
                 mLoggedBytes += mUseSize[mCurrentLogBuffer];
                 mCurrentLogBuffer = (mCurrentLogBuffer+1)%BUFFER_COUNT;
             }
         }
 
         mOutputStream.write((char*)mLogBuffer[mCurrentLogBuffer].data(), mUseSize[mCurrentLogBuffer]);
-        std::cout << "logging[" << mUseSize[mCurrentLogBuffer] << "]: @" << (void*)(mLogBuffer[mCurrentLogBuffer].data()) << " "  << toHexString(mLogBuffer[mCurrentLogBuffer].data(), mUseSize[mCurrentLogBuffer]) << "\n";
+        //std::cout << "logging[" << mUseSize[mCurrentLogBuffer] << "]: @" << (void*)(mLogBuffer[mCurrentLogBuffer].data()) << " "  << toHexString(mLogBuffer[mCurrentLogBuffer].data(), mUseSize[mCurrentLogBuffer]) << "\n";
         mLoggedBytes += mUseSize[mCurrentLogBuffer];
+        mRunning = false;
     }
 
     std::array<std::array<uint8_t, BUFFER_SIZE>, BUFFER_COUNT> mLogBuffer;
     std::array<size_t, BUFFER_SIZE> mUseSize;
-    std::mutex mLogBufferMutex;
-    std::condition_variable mLogBufferFlushCv;
+    std::mutex mLogBufferMutex{};
+    std::condition_variable mLogBufferFlushCv{};
     int mCurrentBuffer = 0;
     int mCurrentLogBuffer = 0;
     int mCurrentIdx = 0;
     bool mRunning = false;
+    bool mStop = false;
     size_t mLoggedBytes = 0;
-    std::thread mRun;
     std::fstream mOutputStream;
 };
 
