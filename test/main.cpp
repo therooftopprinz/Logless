@@ -1,4 +1,5 @@
 #include <Logger.hpp>
+#include <sys/mman.h>
 
 void logtask()
 {
@@ -6,7 +7,7 @@ void logtask()
 
     for (int i=0; i<1024*1024; i++)
     {
-        Logless(1, uint32_t(i), uint16_t(0xffff));
+        Logless(1, uint64_t(i), uint64_t(0xffff));
     }
 
     uint64_t timeNow = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now().time_since_epoch()).count();
@@ -16,6 +17,11 @@ void logtask()
 
 int main()
 {
+    mlockall(MCL_CURRENT|MCL_FUTURE);
+
+    Logger::getInstance();
+    using namespace std::literals::chrono_literals;
+
     std::thread a(logtask);
     std::thread b(logtask);
     std::thread c(logtask);
@@ -36,11 +42,6 @@ int main()
     ac.join();
     ad.join();
     ae.join();
-
-    // for (int i=0; i<1024*1024; i++)
-    // {
-    //     Logless(1, uint32_t(i), uint16_t(0xffff));
-    // }
 
     Logger::getInstance().stop();
 }

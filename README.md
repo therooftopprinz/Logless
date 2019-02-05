@@ -5,12 +5,12 @@ Don't log? Logless
 ```cpp
 #include <Logger.hpp>
 ...
-Logless(SOME_ENUM_VALUE_xX_xY_xZ_..., xX, xY, xZ, ...);
+Logless(SOME_UINT16_VALUE_SOME_LOG_INFO_xX_xY_xZ_..., xX, xY, xZ, ...);
 ```
 
 ## Format
 ```
-[(H)(TV)+(E)]+
+[(H)(TV)*(E)]+
 
 Where:
 H (uint16_t) - Log Point Id
