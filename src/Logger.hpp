@@ -1,32 +1,39 @@
 #ifndef __LOGGER_HPP__
 #define __LOGGER_HPP__
 
-#include <mutex>
+#include <unistd.h>
 #include <condition_variable>
+#include <exception>
+#include <iostream>
+#include <cstring>
 #include <fstream>
 #include <sstream>
-#include <iostream>
 #include <iomanip>
+#include <utility>
 #include <thread>
 #include <chrono>
-#include <exception>
+#include <mutex>
 
+#define _ static constexpr
 template<typename> struct TypeTraits;
-template<> struct TypeTraits<uint8_t>  {static constexpr auto type_id = 0xf1;};
-template<> struct TypeTraits<int8_t>   {static constexpr auto type_id = 0xf2;};
-template<> struct TypeTraits<uint16_t> {static constexpr auto type_id = 0xf3;};
-template<> struct TypeTraits<int16_t>  {static constexpr auto type_id = 0xf4;};
-template<> struct TypeTraits<uint32_t> {static constexpr auto type_id = 0xf5;};
-template<> struct TypeTraits<int32_t>  {static constexpr auto type_id = 0xf6;};
-template<> struct TypeTraits<uint64_t> {static constexpr auto type_id = 0xf7;};
-template<> struct TypeTraits<int64_t>  {static constexpr auto type_id = 0xf8;};
-template<> struct TypeTraits<float>    {static constexpr auto type_id = 0xf9;};
-template<> struct TypeTraits<double>   {static constexpr auto type_id = 0xfa;};
+template<> struct TypeTraits<uint8_t>     {_ auto type_id = 0xa1; _ size_t size =  sizeof(uint8_t);     _ char cfmt[] = "%c";};
+template<> struct TypeTraits<int8_t>      {_ auto type_id = 0xa2; _ size_t size =  sizeof(int8_t);      _ char cfmt[] = "%c";};
+template<> struct TypeTraits<uint16_t>    {_ auto type_id = 0xa3; _ size_t size =  sizeof(uint16_t);    _ char cfmt[] = "%u";};
+template<> struct TypeTraits<int16_t>     {_ auto type_id = 0xa4; _ size_t size =  sizeof(int16_t);     _ char cfmt[] = "%d";};
+template<> struct TypeTraits<uint32_t>    {_ auto type_id = 0xa5; _ size_t size =  sizeof(uint32_t);    _ char cfmt[] = "%u";};
+template<> struct TypeTraits<int32_t>     {_ auto type_id = 0xa6; _ size_t size =  sizeof(int32_t);     _ char cfmt[] = "%d";};
+template<> struct TypeTraits<uint64_t>    {_ auto type_id = 0xa7; _ size_t size =  sizeof(uint64_t);    _ char cfmt[] = "%ld";};
+template<> struct TypeTraits<int64_t>     {_ auto type_id = 0xa8; _ size_t size =  sizeof(int64_t);     _ char cfmt[] = "%lu";};
+template<> struct TypeTraits<float>       {_ auto type_id = 0xa9; _ size_t size =  sizeof(float);       _ char cfmt[] = "%f";};
+template<> struct TypeTraits<double>      {_ auto type_id = 0xaa; _ size_t size =  sizeof(double);      _ char cfmt[] = "%f";};
+template<> struct TypeTraits<void*>       {_ auto type_id = 0xab; _ size_t size =  sizeof(void*);       _ char cfmt[] = "%p";};
+template<> struct TypeTraits<const char*> {_ auto type_id = 0xac; _ size_t size =  sizeof(const char*); _ char cfmt[] = "%s";};
+#undef _
 
 template <typename... Ts>
 struct TotalSize
 {
-    static constexpr size_t value = (sizeof(Ts)+...);
+    static constexpr size_t value = (TypeTraits<Ts>::size+...);
 };
 
 std::string toHexString(const uint8_t* pData, size_t size)
@@ -43,146 +50,121 @@ std::string toHexString(const uint8_t* pData, size_t size)
 class Logger
 {
 public:
-    static constexpr size_t BUFFER_SIZE = 1024*1024;
-    static constexpr size_t BUFFER_COUNT = 512;
-    using HeaderType = uint64_t;
+    using HeaderType = int32_t;
     using TagType    = uint8_t;
-    using TailType   = uint64_t;
+    using TailType   = uint8_t;
     template<typename... Ts>
-    void log(uint16_t id, const Ts&... ts)
+    void log(const char * id, uint64_t pTime, uint64_t pThread, const Ts&... ts)
     {
-
-
-        constexpr size_t payloadSize = sizeof(HeaderType) + sizeof(TagType)*sizeof...(Ts) + TotalSize<Ts...>::value + sizeof(TailType);
-        uint8_t* usedBuffer;
-        int usedIdx = 0;
-
+        if (mLogful)
         {
-            std::unique_lock<std::mutex> lock(mLogBufferMutex);
-
-            if (mCurrentIdx + payloadSize <= BUFFER_SIZE)
-            {
-                usedIdx = mCurrentIdx;
-                mCurrentIdx += payloadSize;
-                mUseSize[mCurrentBuffer] = mCurrentIdx;
-            }
-            else
-            {
-                auto nextCurr = mCurrentBuffer = (mCurrentBuffer+1) % BUFFER_COUNT;
-                if (nextCurr == mCurrentLogBuffer)
-                {
-                    throw std::runtime_error("log buffer overrun pls fix");
-                }
-                mUseSize[mCurrentBuffer] = mCurrentIdx;
-
-                mCurrentIdx = payloadSize;
-                mCurrentBuffer = nextCurr;
-                mLogBufferFlushCv.notify_one();
-            }
+            uint8_t logbuff[192];
+            int flen = std::sprintf((char*)logbuff, "%luus %lut ", pTime, pThread);
+            size_t sz = logful(logbuff, id, ts...);
+            logbuff[sz++] = '\n';
+            ::write(1, logbuff, sz);
         }
-
-        usedBuffer = mLogBuffer[mCurrentBuffer].data();
-
-        // LOG HEADER
-        new (usedBuffer + usedIdx) HeaderType(id);
-        usedIdx += sizeof(HeaderType);
-        log(usedBuffer, usedIdx, ts...);
+        else
+        {       
+            constexpr size_t payloadSize = sizeof(HeaderType) + sizeof(TagType)*2 + sizeof(pTime) + sizeof(pThread) +
+                sizeof(TagType)*sizeof...(Ts) + TotalSize<Ts...>::value + sizeof(TailType);
+            uint8_t usedBuffer[payloadSize];
+            int usedIdx = 0;
+            new (usedBuffer + usedIdx) HeaderType(intptr_t(id)-intptr_t(LoggerRef));
+            usedIdx += sizeof(HeaderType);
+            logless(usedBuffer, usedIdx, pTime, pThread, ts...);
+            std::fwrite((char*)usedBuffer, 1, payloadSize, mOutputFile);
+        }
     }
-
+    void logful()
+    {
+        mLogful = true;
+    }
+    void logless()
+    {
+        mLogful = false;
+    }
     static Logger& getInstance()
     {
         static Logger logger{};
         return logger;
     }
 
-    void stop()
-    {
-        std::cout << "Logger::~Logger\n";
-        std::unique_lock<std::mutex> lock(mLogBufferMutex);
-        mStop = true;
-        mLogBufferFlushCv.notify_one();
-        lock.unlock();
-        mOutputStream.close();
-        std::cout << "Total bytes logged: " << mLoggedBytes << "\n";
-        while(mRunning);
-    }
-
 private:
 
     Logger()
-        : mOutputStream(std::fstream("log.bin", std::ios::binary))
+        : mOutputFile(std::fopen("log.bin", "wb"))
     {
         std::cout << "Logger::Logger\n";
-        std::thread(&Logger::run, this).detach();
     }
 
     ~Logger()
     {
+        std::fclose(mOutputFile);
     }
 
-    void log(uint8_t* pUsedBuffer, int& pUsedIndex)
+    const char* findNextToken(char pTok, const char* pStr)
     {
-        // LOG TAIL
+        while (*pStr!=0&&*pStr!=pTok)
+        {
+            pStr++;
+        }
+        return pStr;
+    }
+
+    size_t logful(uint8_t* pOut, const char* pMsg)
+    {
+        const char *nTok = findNextToken('_',pMsg);
+        size_t sglen = uintptr_t(nTok)-uintptr_t(pMsg);
+        std::memcpy(pOut, pMsg, sglen);
+        return sglen;
+    }
+
+    template<typename T, typename... Ts>
+    size_t logful(uint8_t* pOut, const char* pMsg, T t, Ts... ts)
+    {
+        const char *nTok = findNextToken('_',pMsg);
+        size_t sglen = uintptr_t(nTok)-uintptr_t(pMsg);
+        std::memcpy(pOut, pMsg, sglen);
+        pMsg+=sglen;
+        pOut+=sglen;
+        int flen = 0;
+        if (*nTok)
+        {
+            flen = std::sprintf((char*)pOut, TypeTraits<T>::cfmt, t);
+            pMsg++;
+        }
+        if (flen>0) pOut += flen;
+        return sglen + flen + logful(pOut, pMsg, ts...);
+    }
+
+    void logless(uint8_t* pUsedBuffer, int& pUsedIndex)
+    {
         new (pUsedBuffer+pUsedIndex) TailType(0);
     }
 
     template<typename T, typename... Ts>
-    void log(uint8_t* pUsedBuffer, int& pUsedIndex, T t, Ts... ts)
+    void logless(uint8_t* pUsedBuffer, int& pUsedIndex, T t, Ts... ts)
     {
         new (pUsedBuffer + pUsedIndex) TagType(TypeTraits<T>::type_id);
         pUsedIndex += sizeof(TagType);
         new (pUsedBuffer + pUsedIndex) T(t);
         pUsedIndex += sizeof(T);
-        log(pUsedBuffer, pUsedIndex, ts...);
+        logless(pUsedBuffer, pUsedIndex, ts...);
     }
 
-    void run()
-    {
-        mRunning = true;
-        mStop = false;
-        while(!mStop)
-        {
-            {
-                std::unique_lock<std::mutex> lock(mLogBufferMutex);
-                mLogBufferFlushCv.wait(lock, [this](){return mCurrentLogBuffer != mCurrentBuffer || mStop;});
-            }
-
-            while (mCurrentLogBuffer != mCurrentBuffer)
-            {
-                mOutputStream.write((char*)mLogBuffer[mCurrentLogBuffer].data(), mUseSize[mCurrentLogBuffer]);
-                // std::cout << "logging[" << mUseSize[mCurrentLogBuffer] << "]: @" << (void*)(mLogBuffer[mCurrentLogBuffer].data()) << " "  << toHexString(mLogBuffer[mCurrentLogBuffer].data(), mUseSize[mCurrentLogBuffer]) << "\n";
-                mLoggedBytes += mUseSize[mCurrentLogBuffer];
-                mCurrentLogBuffer = (mCurrentLogBuffer+1)%BUFFER_COUNT;
-            }
-        }
-
-        mOutputStream.write((char*)mLogBuffer[mCurrentLogBuffer].data(), mUseSize[mCurrentLogBuffer]);
-        // std::cout << "logging[" << mUseSize[mCurrentLogBuffer] << "]: @" << (void*)(mLogBuffer[mCurrentLogBuffer].data()) << " "  << toHexString(mLogBuffer[mCurrentLogBuffer].data(), mUseSize[mCurrentLogBuffer]) << "\n";
-        mLoggedBytes += mUseSize[mCurrentLogBuffer];
-        mRunning = false;
-    }
-
-    std::array<std::array<uint8_t, BUFFER_SIZE>, BUFFER_COUNT> mLogBuffer;
-    std::array<size_t, BUFFER_COUNT> mUseSize;
-    std::mutex mLogBufferMutex{};
-    std::condition_variable mLogBufferFlushCv{};
-    int mCurrentBuffer = 0;
-    int mCurrentLogBuffer = 0;
-    int mCurrentIdx = 0;
-    bool mRunning = false;
-    bool mStop = false;
-    size_t mLoggedBytes = 0;
-    std::fstream mOutputStream;
+    std::FILE* mOutputFile;
+    bool mLogful = false;
+    static constexpr const char* LoggerRef = "LoggerRefXD";
 };
 
 template <typename... Ts>
-void Logless(uint16_t id, Ts... ts)
+void Logless(const char* id, Ts... ts)
 {
-    // static uint64_t timeBase = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now().time_since_epoch()).count();
-    // uint64_t timeNow = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now().time_since_epoch()).count();
-    // uint64_t threadId = std::hash<std::thread::id>()(std::this_thread::get_id());
-    // Logger::getInstance().log(id, timeNow, threadId, ts...);
-    Logger::getInstance().log(id, ts...);
+    static uint64_t timeBase = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now().time_since_epoch()).count();
+    uint64_t timeNow = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now().time_since_epoch()).count();
+    uint64_t threadId = std::hash<std::thread::id>()(std::this_thread::get_id());
+    Logger::getInstance().log(id, timeNow, threadId, ts...);
 }
 
 #endif // __LOGGER_HPP__

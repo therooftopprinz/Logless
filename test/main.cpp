@@ -1,13 +1,14 @@
-#include <Logger.hpp>
+    #include <Logger.hpp>
 #include <sys/mman.h>
 
 void logtask()
 {
     uint64_t timeBase = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now().time_since_epoch()).count();
 
-    for (int i=0; i<1024*1024; i++)
+    for (int i=0; i<1024*1024/10; i++)
     {
-        Logless(1, uint64_t(i), uint64_t(0xffff));
+        Logless("Log me pls _ _ huhu", i, 0xffff);
+        Logless("                    _ , _, _", i, (void*)0xffff, "hello");
     }
 
     uint64_t timeNow = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now().time_since_epoch()).count();
@@ -15,12 +16,13 @@ void logtask()
     std::cout << "TD: " << timeNow - timeBase << "\n";
 }
 
-int main()
+void runBM()
 {
-    mlockall(MCL_CURRENT|MCL_FUTURE);
-
-    Logger::getInstance();
     using namespace std::literals::chrono_literals;
+
+    uint64_t timeBase = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now().time_since_epoch()).count();
+
+    Logger::getInstance().logless();
 
     std::thread a(logtask);
     std::thread b(logtask);
@@ -43,5 +45,20 @@ int main()
     ad.join();
     ae.join();
 
-    Logger::getInstance().stop();
+    uint64_t timeNow = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now().time_since_epoch()).count();
+
+    std::cout << "ALL: " << timeNow - timeBase << "\n";
+}
+
+int main()
+{
+    // mlockall(MCL_CURRENT|MCL_FUTURE);
+
+    Logger::getInstance();
+    int a = 42;
+    float b = 4.2;
+    Logless("INT _ FLOAT _", a, b);
+    
+    // runBM();
+
 }
