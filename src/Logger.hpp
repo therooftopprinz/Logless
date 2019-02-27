@@ -27,7 +27,6 @@ template<> struct TypeTraits<int64_t>     {_ auto type_id = 0xa8; _ size_t size 
 template<> struct TypeTraits<float>       {_ auto type_id = 0xa9; _ size_t size =  sizeof(float);       _ char cfmt[] = "%f";};
 template<> struct TypeTraits<double>      {_ auto type_id = 0xaa; _ size_t size =  sizeof(double);      _ char cfmt[] = "%f";};
 template<> struct TypeTraits<void*>       {_ auto type_id = 0xab; _ size_t size =  sizeof(void*);       _ char cfmt[] = "%p";};
-template<> struct TypeTraits<const char*> {_ auto type_id = 0xac; _ size_t size =  sizeof(const char*); _ char cfmt[] = "%s";};
 #undef _
 
 template <typename... Ts>

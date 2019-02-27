@@ -8,7 +8,7 @@ void logtask()
     for (int i=0; i<1024*1024/10; i++)
     {
         Logless("Log me pls _ _ huhu", i, 0xffff);
-        Logless("                    _ , _, _", i, (void*)0xffff, "hello");
+        Logless("                    _ , _", i, (void*)0xffff);
     }
 
     uint64_t timeNow = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now().time_since_epoch()).count();
