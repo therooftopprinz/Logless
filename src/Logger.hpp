@@ -38,6 +38,13 @@ struct TotalSize
     static constexpr size_t value = (TypeTraits<Ts>::size+...);
 };
 
+template<>
+struct TotalSize<>
+{
+    static constexpr size_t value = 0;
+};
+
+
 std::string toHexString(const uint8_t* pData, size_t size)
 {
     std::stringstream ss;;
