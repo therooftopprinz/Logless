@@ -1,39 +1,42 @@
 #include <Logger.hpp>
 #include <sys/mman.h>
 
-void logtask()
+void logtask(int div)
 {
     uint64_t timeBase = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now().time_since_epoch()).count();
     uint8_t buff[] = {0xde,0xad,0xbe,0xef,0xca,0xfe};
 
-    for (int i=0; i<1024*1024/10; i++)
+    for (int i=0; i<1024*1024/div; i++)
     {
-        Logless("Log me pls _ huhu _", i, BufferLog(6, buff));
+        Logless("Hello logger: msg number _", i);
+        // Logless("Log me pls _ huhu _", i, BufferLog(6, buff));
     }
 
     uint64_t timeNow = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now().time_since_epoch()).count();
 
-    std::cout << "TD: " << timeNow - timeBase << "\n";
+    std::cout << "TD(/" << div << "): " << timeNow - timeBase << "\n";
 }
 
 void runBM()
 {
     using namespace std::literals::chrono_literals;
 
-    uint64_t timeBase = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now().time_since_epoch()).count();
-
     Logger::getInstance().logless();
 
-    std::thread a(logtask);
-    std::thread b(logtask);
-    std::thread c(logtask);
-    std::thread d(logtask);
-    std::thread e(logtask);
-    std::thread aa(logtask);
-    std::thread ab(logtask);
-    std::thread ac(logtask);
-    std::thread ad(logtask);
-    std::thread ae(logtask);
+    std::cout << "1 thread 1000000 logs:\n";
+    logtask(1);
+    uint64_t timeBase = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now().time_since_epoch()).count();
+    std::cout << "10 threads 1000000 logs:\n";
+    std::thread a(logtask, 10);
+    std::thread b(logtask, 10);
+    std::thread c(logtask, 10);
+    std::thread d(logtask, 10);
+    std::thread e(logtask, 10);
+    std::thread aa(logtask, 10);
+    std::thread ab(logtask, 10);
+    std::thread ac(logtask, 10);
+    std::thread ad(logtask, 10);
+    std::thread ae(logtask, 10);
     a.join();
     b.join();
     c.join();

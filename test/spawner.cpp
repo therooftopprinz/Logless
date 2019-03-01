@@ -100,6 +100,7 @@ public:
                 mSs << std::dec << i;
                 mState = State::Tag;
                 mReadSz = 0;
+                break;
             }
             case State::ParamU8:
             {
@@ -109,6 +110,7 @@ public:
                 mSs << std::dec << i;
                 mState = State::Tag;
                 mReadSz = 0;
+                break;
             }
             case State::Param16:
             {
@@ -268,7 +270,7 @@ private:
     State mState = State::Logpoint;
     char mReadBuff[128];
     size_t mReadSz = 0;
-    int mRefPos;
+    size_t mRefPos;
     // logline
     const char* mLogPoint = nullptr;
     uint64_t mLogTime;

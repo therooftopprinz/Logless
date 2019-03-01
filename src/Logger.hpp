@@ -202,7 +202,6 @@ private:
 template <typename... Ts>
 void Logless(const char* id, Ts... ts)
 {
-    static uint64_t timeBase = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now().time_since_epoch()).count();
     uint64_t timeNow = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now().time_since_epoch()).count();
     uint64_t threadId = std::hash<std::thread::id>()(std::this_thread::get_id());
     Logger::getInstance().log(id, timeNow, threadId, ts...);
