@@ -58,6 +58,7 @@ int main()
     int a = 42;
     float b = 4.2;
     Logless("INT _ FLOAT _", a, b);
+    Logless("&b _ this", a, (void*)&b);
     
     // runBM();
 
