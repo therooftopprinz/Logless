@@ -2,8 +2,6 @@
 #define __LOGGER_HPP__
 
 #include <unistd.h>
-#include <condition_variable>
-#include <exception>
 #include <iostream>
 #include <cstring>
 #include <fstream>
@@ -12,7 +10,6 @@
 #include <utility>
 #include <thread>
 #include <chrono>
-#include <mutex>
 
 using BufferLog = std::pair<uint16_t, void*>;
 
@@ -29,7 +26,7 @@ template<> struct TypeTraits<int64_t>     {_ auto type_id = 0xa8; _ size_t size 
 template<> struct TypeTraits<float>       {_ auto type_id = 0xa9; _ size_t size =  sizeof(float);       _ char cfmt[] = "%f";};
 template<> struct TypeTraits<double>      {_ auto type_id = 0xaa; _ size_t size =  sizeof(double);      _ char cfmt[] = "%f";};
 template<> struct TypeTraits<void*>       {_ auto type_id = 0xab; _ size_t size =  sizeof(void*);       _ char cfmt[] = "%p";};
-template<> struct TypeTraits<BufferLog>   {_ auto type_id = 0xac; _ size_t size =  sizeof(void*);       _ char cfmt[] = "%s";};
+template<> struct TypeTraits<BufferLog>   {_ auto type_id = 0xac; _ size_t size = 0;                    _ char cfmt[] = "%s";};
 #undef _
 
 template <typename... Ts>
@@ -67,21 +64,21 @@ public:
     {
         if (mLogful)
         {
-            uint8_t logbuff[192];
+            uint8_t logbuff[4096];
             int flen = std::sprintf((char*)logbuff, "%luus %lut ", pTime, pThread);
             size_t sz = logful(logbuff + flen, id, ts...) + flen;
             logbuff[sz++] = '\n';
             ::write(1, logbuff, sz);
         }
         {       
-            constexpr size_t payloadSize = sizeof(HeaderType) + sizeof(TagType)*2 + sizeof(pTime) + sizeof(pThread) +
-                sizeof(TagType)*sizeof...(Ts) + TotalSize<Ts...>::value + sizeof(TailType);
-            uint8_t usedBuffer[payloadSize];
+            // constexpr size_t payloadSize = sizeof(HeaderType) + sizeof(TagType)*2 + sizeof(pTime) + sizeof(pThread) +
+                // sizeof(TagType)*sizeof...(Ts) + TotalSize<Ts...>::value + sizeof(TailType);
+            uint8_t usedBuffer[2048];
             int usedIdx = 0;
             new (usedBuffer + usedIdx) HeaderType(intptr_t(id)-intptr_t(LoggerRef));
             usedIdx += sizeof(HeaderType);
-            logless(usedBuffer, usedIdx, pTime, pThread, ts...);
-            std::fwrite((char*)usedBuffer, 1, payloadSize, mOutputFile);
+            size_t sz = logless(usedBuffer, usedIdx, pTime, pThread, ts...) + sizeof(HeaderType);
+            std::fwrite((char*)usedBuffer, 1, sz, mOutputFile);
         }
     }
     void logful()
@@ -167,23 +164,24 @@ private:
     }
 
 
-    void logless(uint8_t* pUsedBuffer, int& pUsedIndex)
+    size_t logless(uint8_t* pUsedBuffer, int& pUsedIndex)
     {
         new (pUsedBuffer+pUsedIndex) TailType(0);
+        return sizeof(TailType);
     }
 
     template<typename T, typename... Ts>
-    void logless(uint8_t* pUsedBuffer, int& pUsedIndex, T t, Ts... ts)
+    size_t logless(uint8_t* pUsedBuffer, int& pUsedIndex, T t, Ts... ts)
     {
         new (pUsedBuffer + pUsedIndex) TagType(TypeTraits<T>::type_id);
         pUsedIndex += sizeof(TagType);
         new (pUsedBuffer + pUsedIndex) T(t);
         pUsedIndex += sizeof(T);
-        logless(pUsedBuffer, pUsedIndex, ts...);
+        return logless(pUsedBuffer, pUsedIndex, ts...) + sizeof(TagType) + sizeof(T);
     }
 
     template<typename... Ts>
-    void logless(uint8_t* pUsedBuffer, int& pUsedIndex, BufferLog t, Ts... ts)
+    size_t logless(uint8_t* pUsedBuffer, int& pUsedIndex, BufferLog t, Ts... ts)
     {
         new (pUsedBuffer + pUsedIndex) TagType(TypeTraits<BufferLog>::type_id);
         pUsedIndex += sizeof(TagType);
@@ -191,7 +189,7 @@ private:
         pUsedIndex += sizeof(BufferLog::first_type);
         std::memcpy(pUsedBuffer + pUsedIndex, t.second, t.first);
         pUsedIndex += t.first;
-        logless(pUsedBuffer, pUsedIndex, ts...);
+        return logless(pUsedBuffer, pUsedIndex, ts...) + sizeof(TagType) + sizeof(BufferLog::first_type) + t.first;
     }
 
     std::FILE* mOutputFile;
