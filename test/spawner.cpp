@@ -10,7 +10,7 @@
 
 class Spawner
 {
-    enum class State {Logpoint, Time, Thread, Tag, Param8, ParamU8, Param16, ParamU16, Param32, ParamU32, Param64, ParamU64, ParamFloat, ParamDouble, ParamVoidP};
+    enum class State {Logpoint, Time, Thread, Tag, Param8, ParamU8, Param16, ParamU16, Param32, ParamU32, Param64, ParamU64, ParamFloat, ParamDouble, ParamVoidP, ParamBufferLogSz, ParamBufferLogData};
 public:
     Spawner(std::vector<char>&& pRodata)
         : mRodata(std::move(pRodata))
@@ -21,8 +21,7 @@ public:
     }
     void in(uint8_t pData)
     {
-        std::cout << "in[" << std::dec << std::setw(2) << std::setfill('0') << mReadSz << "]= "
-                           << std::hex << std::setw(2) << std::setfill('0') << unsigned(pData) << "\n";
+        // std::cout << "in[" << std::dec << std::setw(2) << std::setfill('0') << mReadSz << "]= " << std::hex << std::setw(2) << std::setfill('0') << unsigned(pData) << "\n";
         mReadBuff[mReadSz++] = pData;
         switch (mState)
         {
@@ -35,7 +34,7 @@ public:
                     mLogPoint = mRodata.data() + mRefPos + i;
                     mState = State::Time;
                     mReadSz = 0;
-                    std::cout << "state: Logpoint: " << mLogPoint << "\n";
+                    // std::cout << "state: Logpoint@" << std::dec << i << ": " << mLogPoint << "\n";
                 }
                 break;
             }
@@ -46,7 +45,7 @@ public:
                     std::memcpy(&mLogTime, mReadBuff + sizeof(Logger::TagType), sizeof(mLogTime));
                     mState = State::Thread;
                     mReadSz = 0;
-                    std::cout << "state: Time: " << std::dec << mLogTime << "\n";
+                    // std::cout << "state: Time: " << std::dec << mLogTime << "\n";
                 }
                 break;
             }
@@ -55,8 +54,8 @@ public:
                 if (sizeof(Logger::TagType) + sizeof(uint64_t) == mReadSz)
                 {
                     std::memcpy(&mLogThread, mReadBuff + sizeof(Logger::TagType), sizeof(mLogThread));
-                    std::cout << "state: Thread: " << std::dec << mLogThread << "\n";
-                    mSs << std::hex << mLogTime << "us ";
+                    // std::cout << "state: Thread: " << std::dec << mLogThread << "\n";
+                    mSs << std::dec << mLogTime << "us ";
                     mSs << std::hex << mLogThread << "t ";
                     mState = State::Tag;
                     mReadSz = 0;
@@ -68,8 +67,8 @@ public:
                 auto ntok = findNextToken('_', mLogPoint);
                 size_t sglen = uintptr_t(ntok)-uintptr_t(mLogPoint);
                 std::string_view logSeg(mLogPoint, sglen);
-                std::cout << "state: Tag: " << std::hex << std::setw(2) << std::setfill('0') << unsigned(pData) << "\n";
-                std::cout << "seg:" << logSeg << "\n";
+                // std::cout << "state: Tag: " << std::hex << std::setw(2) << std::setfill('0') << unsigned(pData) << "\n";
+                // std::cout << "seg:" << logSeg << "\n";
                 mSs << logSeg;
                 if (*ntok) mLogPoint = ntok + 1;
                 if (TypeTraits<uint8_t>::type_id == pData)         mState = State::Param8;
@@ -83,10 +82,11 @@ public:
                 else if (TypeTraits<float>::type_id == pData)      mState = State::ParamFloat;
                 else if (TypeTraits<double>::type_id == pData)     mState = State::ParamDouble;
                 else if (TypeTraits<void*>::type_id == pData)      mState = State::ParamVoidP;
+                else if (TypeTraits<BufferLog>::type_id == pData)  mState = State::ParamBufferLogSz;
                 else
                 {
                     std::cout << mSs.str() << "\n";
-                    mSs.clear();
+                    mSs = std::stringstream();
                     mState = State::Logpoint;
                 }
                 mReadSz = 0;
@@ -96,7 +96,7 @@ public:
             {
                 int8_t i;
                 std::memcpy(&i, mReadBuff, sizeof(i));
-                std::cout << "state: Param8: " << std::dec << i << "\n";
+                // std::cout << "state: Param8: " << std::dec << i << "\n";
                 mSs << std::dec << i;
                 mState = State::Tag;
                 mReadSz = 0;
@@ -105,7 +105,7 @@ public:
             {
                 uint8_t i;
                 std::memcpy(&i, mReadBuff, sizeof(i));
-                std::cout << "state: ParamU8: " << std::dec << i << "\n";
+                // std::cout << "state: ParamU8: " << std::dec << i << "\n";
                 mSs << std::dec << i;
                 mState = State::Tag;
                 mReadSz = 0;
@@ -116,7 +116,7 @@ public:
                 {
                     int16_t i;
                     std::memcpy(&i, mReadBuff, sizeof(i));
-                    std::cout << "state: Param16: " << std::dec << i << "\n";
+                    // std::cout << "state: Param16: " << std::dec << i << "\n";
                     mSs << std::dec << i;
                     mState = State::Tag;
                     mReadSz = 0;
@@ -129,7 +129,7 @@ public:
                 {
                     uint16_t i;
                     std::memcpy(&i, mReadBuff, sizeof(i));
-                    std::cout << "state: ParamU16: " << std::dec << i << "\n";
+                    // std::cout << "state: ParamU16: " << std::dec << i << "\n";
                     mSs << std::dec << i;
                     mState = State::Tag;
                     mReadSz = 0;
@@ -142,7 +142,7 @@ public:
                 {
                     int32_t i;
                     std::memcpy(&i, mReadBuff, sizeof(i));
-                    std::cout << "state: Param32: " << std::dec << i << "\n";
+                    // std::cout << "state: Param32: " << std::dec << i << "\n";
                     mSs << std::dec << i;
                     mState = State::Tag;
                     mReadSz = 0;
@@ -155,7 +155,7 @@ public:
                 {
                     uint32_t i;
                     std::memcpy(&i, mReadBuff, sizeof(i));
-                    std::cout << "state: ParamU32: " << std::dec << i << "\n";
+                    // std::cout << "state: ParamU32: " << std::dec << i << "\n";
                     mSs << std::dec << i;
                     mState = State::Tag;
                     mReadSz = 0;
@@ -168,7 +168,7 @@ public:
                 {
                     int64_t i;
                     std::memcpy(&i, mReadBuff, sizeof(i));
-                    std::cout << "state: Param64: " << std::dec << i << "\n";
+                    // std::cout << "state: Param64: " << std::dec << i << "\n";
                     mSs << std::dec << i;
                     mState = State::Tag;
                     mReadSz = 0;
@@ -181,7 +181,7 @@ public:
                 {
                     uint64_t i;
                     std::memcpy(&i, mReadBuff, sizeof(i));
-                    std::cout << "state: ParamU64: " << std::dec << i << "\n";
+                    // std::cout << "state: ParamU64: " << std::dec << i << "\n";
                     mSs << std::dec << i;
                     mState = State::Tag;
                     mReadSz = 0;
@@ -194,7 +194,7 @@ public:
                 {
                     float i;
                     std::memcpy(&i, mReadBuff, sizeof(i));
-                    std::cout << "state: ParamFloat: " << std::dec << i << "\n";
+                    // std::cout << "state: ParamFloat: " << std::dec << i << "\n";
                     mSs << std::dec << i;
                     mState = State::Tag;
                     mReadSz = 0;
@@ -205,9 +205,9 @@ public:
             {
                 if (sizeof(double) == mReadSz)
                 {
-                    float i;
+                    double i;
                     std::memcpy(&i, mReadBuff, sizeof(i));
-                    std::cout << "state: ParamDouble: " << std::dec << i << "\n";
+                    // std::cout << "state: ParamDouble: " << std::dec << i << "\n";
                     mSs << std::dec << i;
                     mState = State::Tag;
                     mReadSz = 0;
@@ -220,7 +220,32 @@ public:
                 {
                     void* i;
                     std::memcpy(&i, mReadBuff, sizeof(i));
-                    std::cout << "state: ParamVoidP: " << i << "\n";
+                    // std::cout << "state: ParamVoidP: " << i << "\n";
+                    mSs << i;
+                    mState = State::Tag;
+                    mReadSz = 0;
+                }
+                break;
+            }
+            case State::ParamBufferLogSz:
+            {
+                if (sizeof(BufferLog::first_type) == mReadSz)
+                {
+                    BufferLog::first_type i;
+                    std::memcpy(&i, mReadBuff, sizeof(i));
+                    // std::cout << "state: ParamBufferLogSz: " << i << "\n";
+                    mBufferLogSz = i;
+                    mState = State::ParamBufferLogData;
+                    mReadSz = 0;
+                }
+                break;
+            }
+            case State::ParamBufferLogData:
+            {
+                if (mBufferLogSz== mReadSz)
+                {
+                    auto i = toHexString((uint8_t*)mReadBuff, mReadSz);
+                    // std::cout << "state: ParamBufferLogData: " << i << "\n";
                     mSs << i;
                     mState = State::Tag;
                     mReadSz = 0;
@@ -248,18 +273,12 @@ private:
     const char* mLogPoint = nullptr;
     uint64_t mLogTime;
     uint64_t mLogThread;
+    BufferLog::first_type mBufferLogSz;
     std::stringstream mSs;
 };
 
 int main(int argc, const char* argv[])
 {
-    { 
-        std::vector<uint8_t> roda = {0x01,0x00,0x02,0x00,0x02,0x00,0x00,0x00,0x77,0x62,0x00,0x6c,0x6f,0x67,0x2e,0x62,0x69,0x6e,0x00,0x4c,0x6f,0x67,0x67,0x65,0x72,0x3a,0x3a,0x4c,0x6f,0x67,0x67,0x65,0x72,0x0a,0x00,0x4c,0x6f,0x67,0x20,0x6d,0x65,0x20,0x70,0x6c,0x73,0x20,0x5f,0x20,0x5f,0x20,0x68,0x75,0x68,0x75,0x00,0x20,0x20,0x20,0x20,0x20,0x20,0x20,0x20,0x20,0x20,0x20,0x20,0x20,0x20,0x20,0x20,0x20,0x20,0x20,0x20,0x5f,0x20,0x2c,0x20,0x5f,0x00,0x54,0x44,0x3a,0x20,0x00,0x0a,0x00,0x41,0x4c,0x4c,0x3a,0x20,0x00,0x49,0x4e,0x54,0x20,0x5f,0x20,0x46,0x4c,0x4f,0x41,0x54,0x20,0x5f,0x00,0x26,0x62,0x20,0x5f,0x20,0x74,0x68,0x69,0x73,0x00,0x25,0x6c,0x75,0x75,0x73,0x20,0x25,0x6c,0x75,0x74,0x20,0x00,0x4c,0x6f,0x67,0x67,0x65,0x72,0x52,0x65,0x66,0x58,0x44,0x00,0x00,0x00,0x66,0x66,0x86,0x40,0x25,0x64,0x00,0x25,0x66,0x00,0x25,0x70,0x00,0x00,0x00,0x00,0x4e,0x53,0x74,0x36,0x74,0x68,0x72,0x65,0x61,0x64,0x31,0x31,0x5f,0x53,0x74,0x61,0x74,0x65,0x5f,0x69,0x6d,0x70,0x6c,0x49,0x4e,0x53,0x5f,0x38,0x5f,0x49,0x6e,0x76,0x6f,0x6b,0x65,0x72,0x49,0x53,0x74,0x35,0x74,0x75,0x70,0x6c,0x65,0x49,0x4a,0x50,0x46,0x76,0x76,0x45,0x45,0x45,0x45,0x45,0x45,0x45,0x00};
-        auto rodao = fopen("test.rodata", "w");
-        fwrite((char*)roda.data(), 1, roda.size(), rodao);
-        fclose(rodao);
-    }
-
     std::vector<char> rodata;
     auto rodatefile  = fopen(argv[1], "r");
     auto loglessfile = fopen(argv[2], "r");

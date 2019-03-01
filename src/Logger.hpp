@@ -14,6 +14,8 @@
 #include <chrono>
 #include <mutex>
 
+using BufferLog = std::pair<uint16_t, void*>;
+
 #define _ static constexpr
 template<typename> struct TypeTraits;
 template<> struct TypeTraits<uint8_t>     {_ auto type_id = 0xa1; _ size_t size =  sizeof(uint8_t);     _ char cfmt[] = "%c";};
@@ -27,6 +29,7 @@ template<> struct TypeTraits<int64_t>     {_ auto type_id = 0xa8; _ size_t size 
 template<> struct TypeTraits<float>       {_ auto type_id = 0xa9; _ size_t size =  sizeof(float);       _ char cfmt[] = "%f";};
 template<> struct TypeTraits<double>      {_ auto type_id = 0xaa; _ size_t size =  sizeof(double);      _ char cfmt[] = "%f";};
 template<> struct TypeTraits<void*>       {_ auto type_id = 0xab; _ size_t size =  sizeof(void*);       _ char cfmt[] = "%p";};
+template<> struct TypeTraits<BufferLog>   {_ auto type_id = 0xac; _ size_t size =  sizeof(void*);       _ char cfmt[] = "%s";};
 #undef _
 
 template <typename... Ts>
@@ -59,11 +62,10 @@ public:
         {
             uint8_t logbuff[192];
             int flen = std::sprintf((char*)logbuff, "%luus %lut ", pTime, pThread);
-            size_t sz = logful(logbuff, id, ts...);
+            size_t sz = logful(logbuff + flen, id, ts...) + flen;
             logbuff[sz++] = '\n';
             ::write(1, logbuff, sz);
         }
-        else
         {       
             constexpr size_t payloadSize = sizeof(HeaderType) + sizeof(TagType)*2 + sizeof(pTime) + sizeof(pThread) +
                 sizeof(TagType)*sizeof...(Ts) + TotalSize<Ts...>::value + sizeof(TailType);
@@ -137,6 +139,27 @@ private:
         return sglen + flen + logful(pOut, pMsg, ts...);
     }
 
+    template<typename... Ts>
+    size_t logful(uint8_t* pOut, const char* pMsg, BufferLog t, Ts... ts)
+    {
+        const char *nTok = findNextToken('_',pMsg);
+        size_t sglen = uintptr_t(nTok)-uintptr_t(pMsg);
+        std::memcpy(pOut, pMsg, sglen);
+        pMsg+=sglen;
+        pOut+=sglen;
+        int flen = 0;
+        if (*nTok)
+        {
+            auto s = toHexString((uint8_t*)t.second, t.first);
+            std::memcpy(pOut, s.data(), s.size());
+            flen += s.size();
+            pMsg++;
+        }
+        if (flen>0) pOut += flen;
+        return sglen + flen + logful(pOut, pMsg, ts...);
+    }
+
+
     void logless(uint8_t* pUsedBuffer, int& pUsedIndex)
     {
         new (pUsedBuffer+pUsedIndex) TailType(0);
@@ -149,6 +172,18 @@ private:
         pUsedIndex += sizeof(TagType);
         new (pUsedBuffer + pUsedIndex) T(t);
         pUsedIndex += sizeof(T);
+        logless(pUsedBuffer, pUsedIndex, ts...);
+    }
+
+    template<typename... Ts>
+    void logless(uint8_t* pUsedBuffer, int& pUsedIndex, BufferLog t, Ts... ts)
+    {
+        new (pUsedBuffer + pUsedIndex) TagType(TypeTraits<BufferLog>::type_id);
+        pUsedIndex += sizeof(TagType);
+        new (pUsedBuffer + pUsedIndex) BufferLog::first_type(t.first);
+        pUsedIndex += sizeof(BufferLog::first_type);
+        std::memcpy(pUsedBuffer + pUsedIndex, t.second, t.first);
+        pUsedIndex += t.first;
         logless(pUsedBuffer, pUsedIndex, ts...);
     }
 
