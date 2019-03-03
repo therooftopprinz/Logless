@@ -72,6 +72,7 @@ int main()
     Logless("Log me pls _", float(4.2));
     Logless("Log me pls _", double(4.2));
     Logless("Log me pls _", BufferLog(6, buff));
+    Logless("Log me pls _", "this iz string");
 
     runBM();
 }

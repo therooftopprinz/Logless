@@ -10,7 +10,16 @@
 
 class Spawner
 {
-    enum class State {Logpoint, Time, Thread, Tag, Param8, ParamU8, Param16, ParamU16, Param32, ParamU32, Param64, ParamU64, ParamFloat, ParamDouble, ParamVoidP, ParamBufferLogSz, ParamBufferLogData};
+    enum class State {
+        Logpoint, Time, Thread, Tag,
+        Param8, ParamU8,
+        Param16, ParamU16,
+        Param32, ParamU32,
+        Param64, ParamU64,
+        ParamFloat, ParamDouble,
+        ParamVoidP,
+        ParamBufferLogSz, ParamBufferLogData,
+        ParamStrSz, ParamStrData};
 public:
     Spawner(std::vector<char>&& pRodata)
         : mRodata(std::move(pRodata))
@@ -83,6 +92,7 @@ public:
                 else if (TypeTraits<double>::type_id == pData)     mState = State::ParamDouble;
                 else if (TypeTraits<void*>::type_id == pData)      mState = State::ParamVoidP;
                 else if (TypeTraits<BufferLog>::type_id == pData)  mState = State::ParamBufferLogSz;
+                else if (TypeTraits<const char*>::type_id == pData)mState = State::ParamStrSz;
                 else
                 {
                     std::cout << mSs.str() << "\n";
@@ -248,6 +258,31 @@ public:
                 {
                     auto i = toHexString((uint8_t*)mReadBuff, mReadSz);
                     // std::cout << "state: ParamBufferLogData: " << i << "\n";
+                    mSs << i;
+                    mState = State::Tag;
+                    mReadSz = 0;
+                }
+                break;
+            }
+            case State::ParamStrSz:
+            {
+                if (sizeof(BufferLog::first_type) == mReadSz)
+                {
+                    BufferLog::first_type i;
+                    std::memcpy(&i, mReadBuff, sizeof(i));
+                    // std::cout << "state: ParamStrSz: " << i << "\n";
+                    mBufferLogSz = i;
+                    mState = State::ParamStrData;
+                    mReadSz = 0;
+                }
+                break;
+            }
+            case State::ParamStrData:
+            {
+                if (mBufferLogSz == mReadSz)
+                {
+                    std::string_view i(mReadBuff, mReadSz);
+                    // std::cout << "state: ParamStrData: " << i << "\n";
                     mSs << i;
                     mState = State::Tag;
                     mReadSz = 0;

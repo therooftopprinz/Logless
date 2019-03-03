@@ -27,6 +27,7 @@ template<> struct TypeTraits<float>       {_ auto type_id = 0xa9; _ size_t size 
 template<> struct TypeTraits<double>      {_ auto type_id = 0xaa; _ size_t size =  sizeof(double);      _ char cfmt[] = "%f";};
 template<> struct TypeTraits<void*>       {_ auto type_id = 0xab; _ size_t size =  sizeof(void*);       _ char cfmt[] = "%p";};
 template<> struct TypeTraits<BufferLog>   {_ auto type_id = 0xac; _ size_t size = 0;                    _ char cfmt[] = "%s";};
+template<> struct TypeTraits<const char*> {_ auto type_id = 0xad; _ size_t size = 0;                    _ char cfmt[] = "%p";};
 #undef _
 
 template <typename... Ts>
@@ -163,6 +164,25 @@ private:
         return sglen + flen + logful(pOut, pMsg, ts...);
     }
 
+    template<typename... Ts>
+    size_t logful(uint8_t* pOut, const char* pMsg, const char *t, Ts... ts)
+    {
+        const char *nTok = findNextToken('_',pMsg);
+        size_t sglen = uintptr_t(nTok)-uintptr_t(pMsg);
+        std::memcpy(pOut, pMsg, sglen);
+        pMsg+=sglen;
+        pOut+=sglen;
+        int flen = 0;
+        if (*nTok)
+        {
+            auto s = std::string_view(t, std::strlen(t));
+            std::memcpy(pOut, s.data(), s.size());
+            flen += s.size();
+            pMsg++;
+        }
+        if (flen>0) pOut += flen;
+        return sglen + flen + logful(pOut, pMsg, ts...);
+    }
 
     size_t logless(uint8_t* pUsedBuffer, int& pUsedIndex)
     {
@@ -191,6 +211,20 @@ private:
         pUsedIndex += t.first;
         return logless(pUsedBuffer, pUsedIndex, ts...) + sizeof(TagType) + sizeof(BufferLog::first_type) + t.first;
     }
+
+    template<typename... Ts>
+    size_t logless(uint8_t* pUsedBuffer, int& pUsedIndex, const char* t, Ts... ts)
+    {
+        new (pUsedBuffer + pUsedIndex) TagType(TypeTraits<const char*>::type_id);
+        pUsedIndex += sizeof(TagType);
+        size_t tlen = strlen(t);
+        new (pUsedBuffer + pUsedIndex) BufferLog::first_type(tlen);
+        pUsedIndex += sizeof(BufferLog::first_type);
+        std::memcpy(pUsedBuffer + pUsedIndex, t, tlen);
+        pUsedIndex += tlen;
+        return logless(pUsedBuffer, pUsedIndex, ts...) + sizeof(TagType) + sizeof(BufferLog::first_type) + tlen;
+    }
+
 
     std::FILE* mOutputFile;
     bool mLogful = false;
