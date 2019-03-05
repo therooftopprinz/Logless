@@ -58,9 +58,9 @@ int main()
     // mlockall(MCL_CURRENT|MCL_FUTURE);
     Logger::getInstance().logful();
     uint8_t buff[] = {0xde,0xad,0xbe,0xef,0xca,0xfe};
-    uint8_t buff2[] = {0xde,0xad,0xbe,0xef,0xde,0xca,0xf8,0xed,0xca,0xfe};
+    uint8_t buff2[] = {0xde,0xad,0xbe,0xef,0xde,0xca,0xf8,0xed,0xca,0xfe,0xde,0xad,0xbe,0xef,0xde,0xca,0xf8,0xed,0xca,0xfe};
 
-    Logless("Log me pls _", BufferLog(10, buff2));
+    Logless("Log me pls _", BufferLog(20, buff2));
     Logless("Log me pls _", int8_t('a'));
     Logless("Log me pls _", uint8_t('a'));
     Logless("Log me pls _", int16_t(0xffff));
@@ -74,5 +74,5 @@ int main()
     Logless("Log me pls _", BufferLog(6, buff));
     Logless("Log me pls _", "this iz string");
 
-    runBM();
+    // runBM();
 }

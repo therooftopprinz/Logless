@@ -15,6 +15,7 @@ class Spawner
         Param8, ParamU8,
         Param16, ParamU16,
         Param32, ParamU32,
+        ParamU32or34, Param32or34,
         Param64, ParamU64,
         ParamFloat, ParamDouble,
         ParamVoidP,
@@ -27,6 +28,20 @@ public:
     {
         if (std::string_view::npos == mRefPos)
             throw std::runtime_error("LoggerRefXD not found in rodata");
+    }
+
+    template<typename T>
+    void decodeParam()
+    {
+        if (sizeof(T) == mReadSz)
+        {
+            T i;
+            std::memcpy(&i, mReadBuff, sizeof(i));
+            // std::cout << "state: " << std::dec << unsigned(mState) << " value: " << i << "\n";
+            mSs << std::dec << i;
+            mState = State::Tag;
+            mReadSz = 0;
+        }
     }
     void in(uint8_t pData)
     {
@@ -80,19 +95,21 @@ public:
                 // std::cout << "seg:" << logSeg << "\n";
                 mSs << logSeg;
                 if (*ntok) mLogPoint = ntok + 1;
-                if (TypeTraits<uint8_t>::type_id == pData)         mState = State::Param8;
-                else if (TypeTraits<int8_t>::type_id == pData)     mState = State::ParamU8;
-                else if (TypeTraits<uint16_t>::type_id == pData)   mState = State::Param16;
-                else if (TypeTraits<int16_t>::type_id == pData)    mState = State::ParamU16;
-                else if (TypeTraits<uint32_t>::type_id == pData)   mState = State::Param32;
-                else if (TypeTraits<int32_t>::type_id == pData)    mState = State::ParamU32;
-                else if (TypeTraits<uint64_t>::type_id == pData)   mState = State::Param64;
-                else if (TypeTraits<int64_t>::type_id == pData)    mState = State::ParamU64;
-                else if (TypeTraits<float>::type_id == pData)      mState = State::ParamFloat;
-                else if (TypeTraits<double>::type_id == pData)     mState = State::ParamDouble;
-                else if (TypeTraits<void*>::type_id == pData)      mState = State::ParamVoidP;
-                else if (TypeTraits<BufferLog>::type_id == pData)  mState = State::ParamBufferLogSz;
-                else if (TypeTraits<const char*>::type_id == pData)mState = State::ParamStrSz;
+                if      (TypeTraits<unsigned char>::type_id == pData)      mState = State::Param8;
+                else if (TypeTraits<signed char>::type_id == pData)        mState = State::ParamU8;
+                else if (TypeTraits<unsigned short>::type_id == pData)     mState = State::Param16;
+                else if (TypeTraits<short>::type_id == pData)              mState = State::ParamU16;
+                else if (TypeTraits<unsigned int>::type_id == pData)       mState = State::Param32;
+                else if (TypeTraits<int>::type_id == pData)                mState = State::ParamU32;
+                else if (TypeTraits<unsigned long>::type_id == pData)      mState = State::ParamU32or34;
+                else if (TypeTraits<long>::type_id == pData)               mState = State::Param32or34;
+                else if (TypeTraits<unsigned long long>::type_id == pData) mState = State::Param64;
+                else if (TypeTraits<long long>::type_id == pData)          mState = State::ParamU64;
+                else if (TypeTraits<float>::type_id == pData)              mState = State::ParamFloat;
+                else if (TypeTraits<double>::type_id == pData)             mState = State::ParamDouble;
+                else if (TypeTraits<void*>::type_id == pData)              mState = State::ParamVoidP;
+                else if (TypeTraits<BufferLog>::type_id == pData)          mState = State::ParamBufferLogSz;
+                else if (TypeTraits<const char*>::type_id == pData)        mState = State::ParamStrSz;
                 else
                 {
                     std::cout << mSs.str() << "\n";
@@ -104,139 +121,65 @@ public:
             }
             case State::Param8:
             {
-                int8_t i;
-                std::memcpy(&i, mReadBuff, sizeof(i));
-                // std::cout << "state: Param8: " << std::dec << i << "\n";
-                mSs << std::dec << i;
-                mState = State::Tag;
-                mReadSz = 0;
-                break;
+                decodeParam<signed char>();
             }
             case State::ParamU8:
             {
-                uint8_t i;
-                std::memcpy(&i, mReadBuff, sizeof(i));
-                // std::cout << "state: ParamU8: " << std::dec << i << "\n";
-                mSs << std::dec << i;
-                mState = State::Tag;
-                mReadSz = 0;
-                break;
+                decodeParam<unsigned char>();
             }
             case State::Param16:
             {
-                if (sizeof(int16_t) == mReadSz)
-                {
-                    int16_t i;
-                    std::memcpy(&i, mReadBuff, sizeof(i));
-                    // std::cout << "state: Param16: " << std::dec << i << "\n";
-                    mSs << std::dec << i;
-                    mState = State::Tag;
-                    mReadSz = 0;
-                }
+                decodeParam<short>();
                 break;
             }
             case State::ParamU16:
             {
-                if (sizeof(uint16_t) == mReadSz)
-                {
-                    uint16_t i;
-                    std::memcpy(&i, mReadBuff, sizeof(i));
-                    // std::cout << "state: ParamU16: " << std::dec << i << "\n";
-                    mSs << std::dec << i;
-                    mState = State::Tag;
-                    mReadSz = 0;
-                }
+                decodeParam<unsigned short>();
                 break;
             }
             case State::Param32:
             {
-                if (sizeof(int32_t) == mReadSz)
-                {
-                    int32_t i;
-                    std::memcpy(&i, mReadBuff, sizeof(i));
-                    // std::cout << "state: Param32: " << std::dec << i << "\n";
-                    mSs << std::dec << i;
-                    mState = State::Tag;
-                    mReadSz = 0;
-                }
+                decodeParam<int>();
                 break;
             }
             case State::ParamU32:
             {
-                if (sizeof(uint32_t) == mReadSz)
-                {
-                    uint32_t i;
-                    std::memcpy(&i, mReadBuff, sizeof(i));
-                    // std::cout << "state: ParamU32: " << std::dec << i << "\n";
-                    mSs << std::dec << i;
-                    mState = State::Tag;
-                    mReadSz = 0;
-                }
+                decodeParam<unsigned int>();
+                break;
+            }
+            case State::Param32or34:
+            {
+                decodeParam<long>();
+                break;
+            }
+            case State::ParamU32or34:
+            {
+                decodeParam<unsigned long>();
                 break;
             }
             case State::Param64:
             {
-                if (sizeof(int64_t) == mReadSz)
-                {
-                    int64_t i;
-                    std::memcpy(&i, mReadBuff, sizeof(i));
-                    // std::cout << "state: Param64: " << std::dec << i << "\n";
-                    mSs << std::dec << i;
-                    mState = State::Tag;
-                    mReadSz = 0;
-                }
+                decodeParam<unsigned long long>();
                 break;
             }
             case State::ParamU64:
             {
-                if (sizeof(uint64_t) == mReadSz)
-                {
-                    uint64_t i;
-                    std::memcpy(&i, mReadBuff, sizeof(i));
-                    // std::cout << "state: ParamU64: " << std::dec << i << "\n";
-                    mSs << std::dec << i;
-                    mState = State::Tag;
-                    mReadSz = 0;
-                }
+                decodeParam<long long>();
                 break;
             }
             case State::ParamFloat:
             {
-                if (sizeof(float) == mReadSz)
-                {
-                    float i;
-                    std::memcpy(&i, mReadBuff, sizeof(i));
-                    // std::cout << "state: ParamFloat: " << std::dec << i << "\n";
-                    mSs << std::dec << i;
-                    mState = State::Tag;
-                    mReadSz = 0;
-                }
+                decodeParam<float>();
                 break;
             }
             case State::ParamDouble:
             {
-                if (sizeof(double) == mReadSz)
-                {
-                    double i;
-                    std::memcpy(&i, mReadBuff, sizeof(i));
-                    // std::cout << "state: ParamDouble: " << std::dec << i << "\n";
-                    mSs << std::dec << i;
-                    mState = State::Tag;
-                    mReadSz = 0;
-                }
+                decodeParam<double>();
                 break;
             }
             case State::ParamVoidP:
             {
-                if (sizeof(void*) == mReadSz)
-                {
-                    void* i;
-                    std::memcpy(&i, mReadBuff, sizeof(i));
-                    // std::cout << "state: ParamVoidP: " << i << "\n";
-                    mSs << i;
-                    mState = State::Tag;
-                    mReadSz = 0;
-                }
+                decodeParam<void*>();
                 break;
             }
             case State::ParamBufferLogSz:
@@ -254,7 +197,7 @@ public:
             }
             case State::ParamBufferLogData:
             {
-                if (mBufferLogSz== mReadSz)
+                if (mBufferLogSz == mReadSz)
                 {
                     auto i = toHexString((uint8_t*)mReadBuff, mReadSz);
                     // std::cout << "state: ParamBufferLogData: " << i << "\n";
