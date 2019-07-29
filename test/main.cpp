@@ -4,7 +4,7 @@
 void logtask(int div)
 {
     uint64_t timeBase = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now().time_since_epoch()).count();
-    uint8_t buff[] = {0xde,0xad,0xbe,0xef,0xca,0xfe};
+    // uint8_t buff[] = {0xde,0xad,0xbe,0xef,0xca,0xfe};
 
     for (int i=0; i<1024*1024/div; i++)
     {

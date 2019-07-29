@@ -147,9 +147,11 @@ public:
         else
         {
             std::cout << mSs.str() << "\n";
-            // Buggy in ARM gcc
+            // RTP TODO: Buggy in ARM gcc
             // mSs = std::stringstream();
-            mSs.str("");
+            mSs.~basic_stringstream();
+            new (&mSs) std::stringstream();
+            // mSs.str("");
             mState = State::Logpoint;
         }
         mReadSz = 0;
@@ -238,7 +240,7 @@ private:
     std::array<std::function<void()>, size_t(State::N)> fn;
     std::vector<char> mRodata;
     State mState = State::Logpoint;
-    char mReadBuff[128];
+    char mReadBuff[4096];
     size_t mReadSz = 0;
     size_t mRefPos;
     // logline

@@ -73,7 +73,7 @@ public:
             logbuff[sz++] = '\n';
             ::write(1, logbuff, sz);
         }
-        {       
+        {
             // constexpr size_t payloadSize = sizeof(HeaderType) + sizeof(TagType)*2 + sizeof(pTime) + sizeof(pThread) +
                 // sizeof(TagType)*sizeof...(Ts) + TotalSize<Ts...>::value + sizeof(TailType);
             uint8_t usedBuffer[2048];
