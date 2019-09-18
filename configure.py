@@ -112,4 +112,6 @@ with open('Makefile','w+') as mf:
     mf.write("test_run : spawner test\n")
     mf.write("\tobjcopy -O binary --only-section=.rodata test test.rodata\n")
     mf.write("\t./test\n")
-    mf.write("\t./spawner test.rodata log.bin\n")
+    mf.write("\t./spawner test.rodata log.bin exiteof > test.log\n")
+    mf.write("\techo log is written at test.log\n")
+

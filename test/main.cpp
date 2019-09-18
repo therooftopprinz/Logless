@@ -18,7 +18,10 @@ void logtask(int div)
     uint64_t timeNow = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now().time_since_epoch()).count();
 
     double logduration = double(timeNow - timeBase)/1000000;
-    std::cout << "logtask logcount=" << NLOGS << " logduration=" << logduration << "s lograte=" <<  (logcount/logduration)/1000000 << " megalogs/second \n";
+
+    std::stringstream ss;
+    ss << "logtask logcount=" << NLOGS << " logduration=" << logduration << "s lograte=" <<  (logcount/logduration)/1000000 << " megalogs/second \n";
+    std::cout << ss.str();
 }
 
 void runBM()
@@ -64,4 +67,6 @@ int main()
     Logless("Log me pls _", "this iz string");
 
     runBM();
+
+    Logger::getInstance().flush();
 }

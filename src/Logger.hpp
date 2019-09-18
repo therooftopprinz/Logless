@@ -65,7 +65,6 @@ public:
     template<typename... Ts>
     void log(const char * id, uint64_t pTime, uint64_t pThread, const Ts&... ts)
     {
-        return;
         if (mLogful)
         {
             uint8_t logbuff[4096];
