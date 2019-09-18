@@ -65,6 +65,7 @@ public:
     template<typename... Ts>
     void log(const char * id, uint64_t pTime, uint64_t pThread, const Ts&... ts)
     {
+        return;
         if (mLogful)
         {
             uint8_t logbuff[4096];
@@ -74,8 +75,6 @@ public:
             ::write(1, logbuff, sz);
         }
         {
-            // constexpr size_t payloadSize = sizeof(HeaderType) + sizeof(TagType)*2 + sizeof(pTime) + sizeof(pThread) +
-                // sizeof(TagType)*sizeof...(Ts) + TotalSize<Ts...>::value + sizeof(TailType);
             uint8_t usedBuffer[2048];
             int usedIdx = 0;
             new (usedBuffer + usedIdx) HeaderType(intptr_t(id)-intptr_t(LoggerRef));
@@ -83,7 +82,6 @@ public:
             size_t sz = logless(usedBuffer, usedIdx, pTime, pThread, ts...) + sizeof(HeaderType);
             std::fwrite((char*)usedBuffer, 1, sz, mOutputFile);
         }
-        flush();
     }
     void logful()
     {

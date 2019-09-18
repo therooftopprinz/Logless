@@ -2,6 +2,7 @@
 #include <functional>
 #include <iostream>
 #include <iomanip>
+#include <cassert>
 #include <sstream>
 #include <vector>
 #include <thread>
@@ -256,8 +257,10 @@ private:
 int main(int argc, const char* argv[])
 {
     std::vector<char> rodata;
+    assert(argc == 4);
     auto rodatefile  = fopen(argv[1], "r");
     auto loglessfile = fopen(argv[2], "r");
+    bool exitEof = std::string_view("exiteof")==argv[3];
     char c;
 
     while (std::fread(&c, 1, 1, rodatefile)>0)
@@ -272,10 +275,14 @@ int main(int argc, const char* argv[])
         {
             spawner.in(c);
         }
-        else
+        else if (!exitEof)
         {
             using namespace std::literals::chrono_literals;
             std::this_thread::sleep_for(5ms); // why is this needed?
+        }
+        else
+        {
+            break;
         }
     }
 }

@@ -1,20 +1,24 @@
+#include <vector>
 #include <Logger.hpp>
 #include <sys/mman.h>
+
+constexpr auto NLOGS = 250000;
 
 void logtask(int div)
 {
     uint64_t timeBase = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now().time_since_epoch()).count();
-    // uint8_t buff[] = {0xde,0xad,0xbe,0xef,0xca,0xfe};
-
-    for (int i=0; i<1024*1024/div; i++)
+    uint8_t buff[] = {0xde,0xad,0xbe,0xef,0xca,0xfe};
+    int logcount = NLOGS/div;
+    for (int i=0; i<logcount; i++)
     {
-        Logless("Hello logger: msg number _", i);
-        // Logless("Log me pls _ huhu _", i, BufferLog(6, buff));
+        // Logless("Hello logger: msg number _", i);
+        Logless("Log me pls _ huhu _", i, BufferLog(6, buff));
     }
 
     uint64_t timeNow = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now().time_since_epoch()).count();
 
-    std::cout << "TD(/" << div << "): " << timeNow - timeBase << "\n";
+    double logduration = double(timeNow - timeBase)/1000000;
+    std::cout << "logtask logcount=" << NLOGS << " logduration=" << logduration << "s lograte=" <<  (logcount/logduration)/1000000 << " megalogs/second \n";
 }
 
 void runBM()
@@ -23,39 +27,24 @@ void runBM()
 
     Logger::getInstance().logless();
 
-    std::cout << "1 thread 1000000 logs:\n";
+    std::cout << "1 thread " << NLOGS << " logs:\n";
     logtask(1);
     uint64_t timeBase = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now().time_since_epoch()).count();
-    std::cout << "10 threads 1000000 logs:\n";
-    std::thread a(logtask, 10);
-    std::thread b(logtask, 10);
-    std::thread c(logtask, 10);
-    std::thread d(logtask, 10);
-    std::thread e(logtask, 10);
-    std::thread aa(logtask, 10);
-    std::thread ab(logtask, 10);
-    std::thread ac(logtask, 10);
-    std::thread ad(logtask, 10);
-    std::thread ae(logtask, 10);
-    a.join();
-    b.join();
-    c.join();
-    d.join();
-    e.join();
-    aa.join();
-    ab.join();
-    ac.join();
-    ad.join();
-    ae.join();
+    constexpr int NTHREAD = 8;
+    std::cout << NTHREAD << " threads " << NLOGS << " logs:\n";
+    
+    std::vector<std::thread> logThread;
+    for (int i=0; i<NTHREAD; i++) logThread.emplace_back(logtask, 1);
+    for (int i=0; i<NTHREAD; i++) logThread[i].join();
 
     uint64_t timeNow = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now().time_since_epoch()).count();
 
-    std::cout << "ALL: " << timeNow - timeBase << "\n";
+    double logduration = double(timeNow - timeBase)/1000000;
+    std::cout << "threaded logtask total logduration=" << logduration << "s lograte="<< (double(NLOGS*NTHREAD)/logduration)/1000000 << " megalogs/second\n";
 }
 
 int main()
 {
-    // mlockall(MCL_CURRENT|MCL_FUTURE);
     Logger::getInstance().logful();
     uint8_t buff[] = {0xde,0xad,0xbe,0xef,0xca,0xfe};
     uint8_t buff2[] = {0xde,0xad,0xbe,0xef,0xde,0xca,0xf8,0xed,0xca,0xfe,0xde,0xad,0xbe,0xef,0xde,0xca,0xf8,0xed,0xca,0xfe};
