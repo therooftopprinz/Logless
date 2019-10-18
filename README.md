@@ -28,7 +28,7 @@ E (uint8_t) - Log Pointer Ender
 # 2nd generate the string data from binary image
 objcopy -O binary --only-section=.rodata YOUR_BINARY RODATA_OUT
 # 3rd spawn it
-./spawner RODATA_OUT exiteof log.bin
+./spawner RODATA_OUT log.bin exiteof
 ```
 You can render while the program is still running.
 

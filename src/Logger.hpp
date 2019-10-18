@@ -11,7 +11,7 @@
 #include <thread>
 #include <chrono>
 
-using BufferLog = std::pair<uint16_t, void*>;
+using BufferLog = std::pair<uint16_t, const void*>;
 
 #define _ static constexpr
 template<typename> struct TypeTraits;
