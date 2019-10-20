@@ -14,7 +14,8 @@
 using BufferLog = std::pair<uint16_t, const void*>;
 
 #define _ static constexpr
-template<typename> struct TypeTraits;
+template<typename>   struct TypeTraits;
+template<typename T> struct TypeTraits<T*>       {_ auto type_id = 0xad; _ size_t size =  sizeof(void*);              _ char cfmt[] = "%p";};
 template<> struct TypeTraits<unsigned char>      {_ auto type_id = 0xa1; _ size_t size =  sizeof(unsigned char);      _ char cfmt[] = "%c";};
 template<> struct TypeTraits<signed char>        {_ auto type_id = 0xa2; _ size_t size =  sizeof(signed char);        _ char cfmt[] = "%c";};
 template<> struct TypeTraits<unsigned short>     {_ auto type_id = 0xa3; _ size_t size =  sizeof(unsigned short);     _ char cfmt[] = "%u";};
@@ -27,7 +28,6 @@ template<> struct TypeTraits<unsigned long long> {_ auto type_id = 0xa9; _ size_
 template<> struct TypeTraits<long long>          {_ auto type_id = 0xaa; _ size_t size =  sizeof(long long);          _ char cfmt[] = "%llu";};
 template<> struct TypeTraits<float>              {_ auto type_id = 0xab; _ size_t size =  sizeof(float);              _ char cfmt[] = "%f";};
 template<> struct TypeTraits<double>             {_ auto type_id = 0xac; _ size_t size =  sizeof(double);             _ char cfmt[] = "%f";};
-template<> struct TypeTraits<void*>              {_ auto type_id = 0xad; _ size_t size =  sizeof(void*);              _ char cfmt[] = "%p";};
 template<> struct TypeTraits<BufferLog>          {_ auto type_id = 0xae; _ size_t size = 0;                           _ char cfmt[] = "%s";};
 template<> struct TypeTraits<const char*>        {_ auto type_id = 0xaf; _ size_t size = 0;                           _ char cfmt[] = "%p";};
 #undef _
@@ -94,22 +94,20 @@ public:
     {
         std::fflush(mOutputFile);
     }
-    static Logger& getInstance()
+    static Logger& getInstance(const char* pFilename = "log.bin")
     {
-        static Logger logger{};
+        static Logger logger{pFilename};
         return logger;
     }
 private:
 
-    Logger()
-        : mOutputFile(std::fopen("log.bin", "wb"))
+    Logger(const char* pFilename)
+        : mOutputFile(std::fopen(pFilename, "wb"))
     {
-        std::cout << "Logger::Logger\n";
     }
 
     ~Logger()
     {
-        std::cout << "Logger::~Logger\n";
         std::fclose(mOutputFile);
     }
 
@@ -242,5 +240,19 @@ void Logless(const char* id, Ts... ts)
     uint64_t threadId = std::hash<std::thread::id>()(std::this_thread::get_id());
     Logger::getInstance().log(id, timeNow, threadId, ts...);
 }
+
+struct LoglessTrace
+{
+    LoglessTrace(const char* pName) : mName(pName)
+    {
+        Logless("Trace _ \\\\", mName);
+    }
+    ~LoglessTrace()
+    {
+        Logless("Trace _ /", mName);
+        Logger::getInstance().flush();
+    }
+    const char* mName;
+};
 
 #endif // __LOGGER_HPP__

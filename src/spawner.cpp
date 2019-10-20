@@ -3,12 +3,13 @@
 #include <iostream>
 #include <iomanip>
 #include <cassert>
+#include <utility>
 #include <sstream>
+#include <cstring>
 #include <vector>
 #include <thread>
 #include <cstdio>
-#include <cstring>
-#include <utility>
+#include <regex>
 #include <Logger.hpp>
 
 namespace spawner
@@ -123,11 +124,27 @@ public:
     void decodeParam(tag pTag)
     {
         auto pData = pTag.data;
-        auto ntok = findNextToken('_', mLogPoint);
+        auto ntok = findNextToken('_', '\\', mLogPoint);
         size_t sglen = uintptr_t(ntok)-uintptr_t(mLogPoint);
-        std::string_view logSeg(mLogPoint, sglen);
+        std::string_view logSegSv(mLogPoint, sglen);
+
+        std::string logSeg;
+        bool escape = false;
+        for (auto c : logSegSv)
+        {
+
+            if (!escape && '\\'==c)
+            {
+                escape = true;
+                continue;
+            }
+            escape = false;
+            logSeg.push_back(c);
+        }
+
         // std::cout << "state: Tag: " << std::hex << std::setw(2) << std::setfill('0') << unsigned(pData) << "\n";
-        // std::cout << "seg:" << logSeg << "\n";
+        // std::cout << "seg str:" << logSeg  << "\n";
+
         mSs << logSeg;
         if (*ntok) mLogPoint = ntok + 1;
         if      (TypeTraits<unsigned char>::type_id == pData)      mState = State::ParamU8;
@@ -229,10 +246,25 @@ private:
             throw std::runtime_error("LoggerRefXD not found in rodata");
     }
 
-    const char* findNextToken(char pTok, const char* pStr)
+    const char* findNextToken(char pTok, char pEsc, const char* pStr)
     {
-        while (*pStr!=0&&*pStr!=pTok)
+        // std::cout << "findNextToken: " << pStr << "\n";
+        while (true)
         {
+            bool escape = false;
+            if (pEsc==*pStr)
+            {
+                pStr++;
+                escape = true;
+            }
+            if (!*pStr)
+            {
+                break;
+            }
+            if (!escape && pTok==*pStr)
+            {
+                break;
+            }
             pStr++;
         }
         return pStr;
@@ -252,7 +284,7 @@ private:
     std::stringstream mSs;
 };
 
-} // spawner
+} //  spawner
 
 int main(int argc, const char* argv[])
 {
