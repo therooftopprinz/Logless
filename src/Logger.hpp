@@ -13,6 +13,17 @@
 
 using BufferLog = std::pair<uint16_t, const void*>;
 
+inline std::string toHexString(const uint8_t* pData, size_t size)
+{
+    std::stringstream ss;;
+    for (size_t i=0; i<size; i++)
+    {
+        ss << std::hex << std::setw(2) << std::setfill('0') << unsigned(pData[i]);
+    }
+
+    return ss.str();
+}
+
 #define _ static constexpr
 template<typename>   struct TypeTraits;
 template<typename T> struct TypeTraits<T*>       {_ auto type_id = 0xad; _ size_t size =  sizeof(void*);              _ char cfmt[] = "%p";};
@@ -45,18 +56,6 @@ struct TotalSize<>
     static constexpr size_t value = 0;
 };
 
-
-inline std::string toHexString(const uint8_t* pData, size_t size)
-{
-    std::stringstream ss;;
-    for (size_t i=0; i<size; i++)
-    {
-        ss << std::hex << std::setw(2) << std::setfill('0') << unsigned(pData[i]);
-    }
-
-    return ss.str();
-}
-
 class Logger
 {
 public:
@@ -75,12 +74,12 @@ public:
             ::write(1, logbuff, sz);
         }
         {
-            uint8_t usedBuffer[4096*2];
-            int usedIdx = 0;
-            new (usedBuffer + usedIdx) HeaderType(intptr_t(id)-intptr_t(LoggerRef));
-            usedIdx += sizeof(HeaderType);
-            size_t sz = logless(usedBuffer, usedIdx, pTime, pThread, ts...) + sizeof(HeaderType);
-            std::fwrite((char*)usedBuffer, 1, sz, mOutputFile);
+            uint8_t buffer[2048];
+            uint8_t* usedBuffer = buffer;
+            new (usedBuffer) HeaderType(intptr_t(id)-intptr_t(LoggerRef));
+            usedBuffer += sizeof(HeaderType);
+            size_t sz = logless(usedBuffer, pTime, pThread, ts...) + sizeof(HeaderType);
+            std::fwrite((char*)buffer, 1, sz, mOutputFile);
         }
     }
     void logful()
@@ -187,53 +186,57 @@ private:
         return sglen + flen + logful(pOut, pMsg, ts...);
     }
 
-    size_t logless(uint8_t* pUsedBuffer, int& pUsedIndex)
+    size_t logless(uint8_t* pUsedBuffer)
     {
-        new (pUsedBuffer+pUsedIndex) TailType(0);
+        new (pUsedBuffer) TailType(0);
         return sizeof(TailType);
     }
 
+
     template<typename T, typename... Ts>
-    size_t logless(uint8_t* pUsedBuffer, int& pUsedIndex, T t, Ts... ts)
+    size_t logless(uint8_t* pUsedBuffer, T t, Ts... ts)
     {
-        new (pUsedBuffer + pUsedIndex) TagType(TypeTraits<T>::type_id);
-        pUsedIndex += sizeof(TagType);
-        new (pUsedBuffer + pUsedIndex) T(t);
-        pUsedIndex += sizeof(T);
-        return logless(pUsedBuffer, pUsedIndex, ts...) + sizeof(TagType) + sizeof(T);
+        new (pUsedBuffer) TagType(TypeTraits<T>::type_id);
+        pUsedBuffer += sizeof(TagType);
+        new (pUsedBuffer) T(t);
+        pUsedBuffer += sizeof(T);
+        return logless(pUsedBuffer, ts...) + sizeof(TagType) + sizeof(T);
     }
 
     template<typename... Ts>
-    size_t logless(uint8_t* pUsedBuffer, int& pUsedIndex, BufferLog t, Ts... ts)
+    size_t logless(uint8_t* pUsedBuffer, BufferLog t, Ts... ts)
     {
-        new (pUsedBuffer + pUsedIndex) TagType(TypeTraits<BufferLog>::type_id);
-        pUsedIndex += sizeof(TagType);
-        new (pUsedBuffer + pUsedIndex) BufferLog::first_type(t.first);
-        pUsedIndex += sizeof(BufferLog::first_type);
-        std::memcpy(pUsedBuffer + pUsedIndex, t.second, t.first);
-        pUsedIndex += t.first;
-        return logless(pUsedBuffer, pUsedIndex, ts...) + sizeof(TagType) + sizeof(BufferLog::first_type) + t.first;
+        new (pUsedBuffer) TagType(TypeTraits<BufferLog>::type_id);
+        pUsedBuffer += sizeof(TagType);
+        new (pUsedBuffer) BufferLog::first_type(t.first);
+        pUsedBuffer += sizeof(BufferLog::first_type);
+        std::memcpy(pUsedBuffer, t.second, t.first);
+        pUsedBuffer += t.first;
+        return logless(pUsedBuffer, ts...) + sizeof(TagType) + sizeof(BufferLog::first_type) + t.first;
     }
 
     template<typename... Ts>
-    size_t logless(uint8_t* pUsedBuffer, int& pUsedIndex, const char* t, Ts... ts)
+    size_t logless(uint8_t* pUsedBuffer, const char* t, Ts... ts)
     {
-        new (pUsedBuffer + pUsedIndex) TagType(TypeTraits<const char*>::type_id);
-        pUsedIndex += sizeof(TagType);
+        new (pUsedBuffer) TagType(TypeTraits<const char*>::type_id);
+        pUsedBuffer += sizeof(TagType);
         size_t tlen = strlen(t);
-        new (pUsedBuffer + pUsedIndex) BufferLog::first_type(tlen);
-        pUsedIndex += sizeof(BufferLog::first_type);
-        std::memcpy(pUsedBuffer + pUsedIndex, t, tlen);
-        pUsedIndex += tlen;
-        return logless(pUsedBuffer, pUsedIndex, ts...) + sizeof(TagType) + sizeof(BufferLog::first_type) + tlen;
+        new (pUsedBuffer) BufferLog::first_type(tlen);
+        pUsedBuffer += sizeof(BufferLog::first_type);
+        std::memcpy(pUsedBuffer, t, tlen);
+        pUsedBuffer += tlen;
+        return logless(pUsedBuffer, ts...) + sizeof(TagType) + sizeof(BufferLog::first_type) + tlen;
     }
 
+<<<<<<< HEAD
     template<typename... Ts>
     size_t logless(uint8_t* pUsedBuffer, int& pUsedIndex, char* t, Ts... ts)
     {
         return logless(pUsedBuffer, pUsedIndex, (const char*)t, ts...);
     }
 
+=======
+>>>>>>> use usedBuffer and remove usedIndex
     std::FILE* mOutputFile;
     bool mLogful = false;
     static const char* LoggerRef;

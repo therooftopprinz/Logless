@@ -33,7 +33,7 @@ void runBM()
     std::cout << "1 thread " << NLOGS << " logs:\n";
     logtask(1);
     uint64_t timeBase = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now().time_since_epoch()).count();
-    constexpr int NTHREAD = 8;
+    constexpr int NTHREAD = 4;
     std::cout << NTHREAD << " threads " << NLOGS << " logs:\n";
     
     std::vector<std::thread> logThread;
