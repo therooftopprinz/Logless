@@ -29,7 +29,8 @@ template<> struct TypeTraits<long long>          {_ auto type_id = 0xaa; _ size_
 template<> struct TypeTraits<float>              {_ auto type_id = 0xab; _ size_t size =  sizeof(float);              _ char cfmt[] = "%f";};
 template<> struct TypeTraits<double>             {_ auto type_id = 0xac; _ size_t size =  sizeof(double);             _ char cfmt[] = "%f";};
 template<> struct TypeTraits<BufferLog>          {_ auto type_id = 0xae; _ size_t size = 0;                           _ char cfmt[] = "%s";};
-template<> struct TypeTraits<const char*>        {_ auto type_id = 0xaf; _ size_t size = 0;                           _ char cfmt[] = "%p";};
+template<> struct TypeTraits<const char*>        {_ auto type_id = 0xaf; _ size_t size = 0;                           _ char cfmt[] = "%s";};
+template<> struct TypeTraits<char*>              {_ auto type_id = 0xaf; _ size_t size = 0;                           _ char cfmt[] = "%s";};
 #undef _
 
 template <typename... Ts>
