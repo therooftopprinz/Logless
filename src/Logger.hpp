@@ -228,6 +228,11 @@ private:
         return logless(pUsedBuffer, pUsedIndex, ts...) + sizeof(TagType) + sizeof(BufferLog::first_type) + tlen;
     }
 
+    template<typename... Ts>
+    size_t logless(uint8_t* pUsedBuffer, int& pUsedIndex, char* t, Ts... ts)
+    {
+        return logless(pUsedBuffer, pUsedIndex, (const char*)t, ts...);
+    }
 
     std::FILE* mOutputFile;
     bool mLogful = false;

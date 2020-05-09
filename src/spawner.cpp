@@ -227,7 +227,7 @@ public:
 
     void in(uint8_t pData)
     {
-        // std::cout << "in[" << std::dec << std::setw(2) << std::setfill('0') << mReadSz << "]= " << std::hex << std::setw(2) << std::setfill('0') << unsigned(pData) << "\n";
+        // std::cout << "in[" << std::dec << std::setw(2) << std::setfill('0') << mReadSz << "]= " << std::hex << std::setw(2) << std::setfill('0') << unsigned(pData) << " " << pData << "\n";
         mReadBuff[mReadSz++] = pData;
         if (mState == State::Tag)
             return decodeParam((tag){pData});
