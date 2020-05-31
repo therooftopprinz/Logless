@@ -249,16 +249,24 @@ void Logless(const char* id, Ts... ts)
 
 struct LoglessTrace
 {
-    LoglessTrace(const char* pName) : mName(pName)
+    LoglessTrace(const char* pName)
+        : mName(pName)
+        , mStart(std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now().time_since_epoch()).count())
     {
-        Logless("Trace _ \\\\", mName);
+        Logless("TRACE _ \\\\", mName);
     }
     ~LoglessTrace()
     {
-        Logless("Trace _ /", mName);
+        auto now = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now().time_since_epoch()).count();
+        auto diff = now-mStart;
+
+        Logless("TRACE _ : runtime: _ /", mName, diff);
         Logger::getInstance().flush();
     }
     const char* mName;
+    uint64_t mStart;
 };
+
+#define LOGLESS_TRACE() LoglessTrace __trace(__PRETTY_FUNCTION__)
 
 #endif // __LOGGER_HPP__
