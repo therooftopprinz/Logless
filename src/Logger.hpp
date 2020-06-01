@@ -253,14 +253,14 @@ struct LoglessTrace
         : mName(pName)
         , mStart(std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now().time_since_epoch()).count())
     {
-        Logless("TRACE _ \\\\", mName);
+        Logless("TRACE ENTER _", mName);
     }
     ~LoglessTrace()
     {
         auto now = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now().time_since_epoch()).count();
         auto diff = now-mStart;
 
-        Logless("TRACE _ : runtime: _ /", mName, diff);
+        Logless("TRACE LEAVE _ TIME _", mName, diff);
         Logger::getInstance().flush();
     }
     const char* mName;

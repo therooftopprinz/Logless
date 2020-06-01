@@ -273,7 +273,7 @@ private:
     std::array<std::function<void()>, size_t(State::N)> fn;
     std::vector<char> mRodata;
     State mState = State::Logpoint;
-    char mReadBuff[4096];
+    char mReadBuff[1024*1024];
     size_t mReadSz = 0;
     size_t mRefPos;
     // logline
