@@ -68,14 +68,14 @@ public:
     {
         if (mLogful)
         {
-            uint8_t logbuff[4096];
+            uint8_t logbuff[4096*2];
             int flen = std::sprintf((char*)logbuff, "%lluus %llut ", (unsigned long long)pTime, (unsigned long long)pThread);
             size_t sz = logful(logbuff + flen, id, ts...) + flen;
             logbuff[sz++] = '\n';
             ::write(1, logbuff, sz);
         }
         {
-            uint8_t usedBuffer[2048];
+            uint8_t usedBuffer[4096*2];
             int usedIdx = 0;
             new (usedBuffer + usedIdx) HeaderType(intptr_t(id)-intptr_t(LoggerRef));
             usedIdx += sizeof(HeaderType);
