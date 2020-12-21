@@ -87,9 +87,9 @@ public:
 
     void decodeParam(logpoint)
     {
-        if (sizeof(int) == mReadSz)
+        if (sizeof(uint64_t) == mReadSz)
         {
-            int i;
+            uint64_t i;
             std::memcpy(&i, mReadBuff, sizeof(i));
             mLogPoint = mRodata.data() + mRefPos + i;
             mState = State::Time;

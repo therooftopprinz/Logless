@@ -1,7 +1,6 @@
 #ifndef __LOGGER_HPP__
 #define __LOGGER_HPP__
 
-#include <unistd.h>
 #include <iostream>
 #include <cstring>
 #include <fstream>
@@ -10,6 +9,8 @@
 #include <utility>
 #include <thread>
 #include <chrono>
+
+#include <unistd.h>
 
 using BufferLog = std::pair<uint16_t, const void*>;
 
@@ -59,7 +60,7 @@ struct TotalSize<>
 class Logger
 {
 public:
-    using HeaderType = int32_t;
+    using HeaderType = int64_t;
     using TagType    = uint8_t;
     using TailType   = uint8_t;
     template<typename... Ts>
@@ -71,7 +72,7 @@ public:
             int flen = std::sprintf((char*)logbuff, "%lluus %llut ", (unsigned long long)pTime, (unsigned long long)pThread);
             size_t sz = logful(logbuff + flen, id, ts...) + flen;
             logbuff[sz++] = '\n';
-            ::write(1, logbuff, sz);
+            [[maybe_unused]] auto rv = ::write(1, logbuff, sz);
         }
         {
             uint8_t buffer[2048];
@@ -228,48 +229,41 @@ private:
         return logless(pUsedBuffer, ts...) + sizeof(TagType) + sizeof(BufferLog::first_type) + tlen;
     }
 
-<<<<<<< HEAD
-    template<typename... Ts>
-    size_t logless(uint8_t* pUsedBuffer, int& pUsedIndex, char* t, Ts... ts)
-    {
-        return logless(pUsedBuffer, pUsedIndex, (const char*)t, ts...);
-    }
-
-=======
->>>>>>> use usedBuffer and remove usedIndex
     std::FILE* mOutputFile;
     bool mLogful = false;
     static const char* LoggerRef;
 };
 
 template <typename... Ts>
-void Logless(const char* id, Ts... ts)
+void Logless(Logger& logger, const char* id, Ts... ts)
 {
     uint64_t timeNow = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now().time_since_epoch()).count();
     uint64_t threadId = std::hash<std::thread::id>()(std::this_thread::get_id());
-    Logger::getInstance().log(id, timeNow, threadId, ts...);
+    logger.log(id, timeNow, threadId, ts...);
 }
 
 struct LoglessTrace
 {
-    LoglessTrace(const char* pName)
+    LoglessTrace(Logger& pLogger, const char* pName)
         : mName(pName)
         , mStart(std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now().time_since_epoch()).count())
+        , mLogger(pLogger)
     {
-        Logless("TRACE ENTER _", mName);
+        Logless(mLogger, "TRACE ENTER _", mName);
     }
     ~LoglessTrace()
     {
         auto now = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now().time_since_epoch()).count();
         auto diff = now-mStart;
 
-        Logless("TRACE LEAVE _ TIME _", mName, diff);
+        Logless(mLogger, "TRACE LEAVE _ TIME _", mName, diff);
         Logger::getInstance().flush();
     }
     const char* mName;
     uint64_t mStart;
+    Logger& mLogger;
 };
 
-#define LOGLESS_TRACE() LoglessTrace __trace(__PRETTY_FUNCTION__)
+#define LOGLESS_TRACE(logger) LoglessTrace __trace(logger, __PRETTY_FUNCTION__)
 
 #endif // __LOGGER_HPP__
