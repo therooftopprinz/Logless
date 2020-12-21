@@ -1,8 +1,0 @@
-cmake_minimum_required(VERSION 3.10)
-
-project(logless)
-
-add_executable(test test/main.cpp)
-add_executable(spawner src/spawner.cpp)
-add_library(logless STATIC src/Logger.cpp)
-

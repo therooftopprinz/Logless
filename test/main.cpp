@@ -1,5 +1,5 @@
 #include <vector>
-#include <Logger.hpp>
+#include <logless/Logger.hpp>
 #include <sys/mman.h>
 
 constexpr auto NLOGS = 1000000;

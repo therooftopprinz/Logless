@@ -10,8 +10,7 @@
 #include <thread>
 #include <cstdio>
 #include <regex>
-#include <Logger.hpp>
-
+#include <logless/Logger.hpp>
 
 namespace spawner
 {
