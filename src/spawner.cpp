@@ -1,3 +1,5 @@
+#include <logless/Logger.hpp>
+
 #include <string_view>
 #include <functional>
 #include <iostream>
@@ -10,7 +12,12 @@
 #include <thread>
 #include <cstdio>
 #include <regex>
-#include <logless/Logger.hpp>
+
+#include <cstdio>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <unistd.h>
 
 namespace spawner
 {
@@ -291,7 +298,6 @@ int main(int argc, const char* argv[])
     std::vector<char> rodata;
     assert(argc == 4);
     auto rodatefile  = fopen(argv[1], "r");
-    auto loglessfile = fopen(argv[2], "r");
     bool exitEof = std::string_view("exiteof")==argv[3];
     char c;
 
@@ -300,21 +306,31 @@ int main(int argc, const char* argv[])
 
     spawner::Spawner spawner(std::move(rodata));
 
+    auto loglessfile = open(argv[2], O_RDONLY);
+
+    if (-1 == loglessfile)
+    {
+        throw std::runtime_error("Failed to open log file!");
+    }
+    
+
     while (1)
     {
-        int rd = std::fread(&c, 1, 1, loglessfile);
-        if (rd)
+        // int rd = std::fread(&c, 1, 1, loglessfile);
+        int rd = read(loglessfile, &c, 1);
+        if (0 < rd)
         {
             spawner.in(c);
         }
-        else if (!exitEof)
+        else if (0 == rd)
         {
-            using namespace std::literals::chrono_literals;
-            std::this_thread::sleep_for(5ms); // why is this needed?
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+            continue;
         }
         else
         {
-            break;
+            using namespace std::string_literals;
+            throw std::runtime_error("error reading: rd="s + std::to_string(rd) + " error=" + std::strerror(errno));
         }
     }
 }
