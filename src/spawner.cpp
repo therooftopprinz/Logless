@@ -84,8 +84,9 @@ public:
         if (sizeof(T) == mReadSz)
         {
             std::memcpy(&i, mReadBuff, sizeof(i));
-            // std::cout << "state: " << std::dec << unsigned(mState) << " value: " << i << "\n";
-            mSs << std::dec << i;
+            snprintf(fmtbuf, sizeof(fmtbuf), tokenFormat.c_str(), i);
+            // std::cout << "state: " << std::dec << unsigned(mState) << "format: " << tokenFormat.c_str() <<  " value: " << fmtbuf << "\n";
+            mSs << fmtbuf;
             mState = State::Tag;
             mReadSz = 0;
         }
@@ -131,44 +132,30 @@ public:
     void decodeParam(tag pTag)
     {
         auto pData = pTag.data;
-        auto ntok = findNextToken('_', '\\', mLogPoint);
+        auto ntok = findNextToken('%', tokenFormat, mLogPoint);
         size_t sglen = uintptr_t(ntok)-uintptr_t(mLogPoint);
-        std::string_view logSegSv(mLogPoint, sglen);
-
-        std::string logSeg;
-        bool escape = false;
-        for (auto c : logSegSv)
-        {
-
-            if (!escape && '\\'==c)
-            {
-                escape = true;
-                continue;
-            }
-            escape = false;
-            logSeg.push_back(c);
-        }
+        std::string logSeg(mLogPoint, sglen);
 
         // std::cout << "state: Tag: " << std::hex << std::setw(2) << std::setfill('0') << unsigned(pData) << "\n";
         // std::cout << "seg str:" << logSeg  << "\n";
 
         mSs << logSeg;
         if (*ntok) mLogPoint = ntok + 1;
-        if      (TypeTraits<unsigned char>::type_id == pData)      mState = State::ParamU8;
-        else if (TypeTraits<signed char>::type_id == pData)        mState = State::Param8;
-        else if (TypeTraits<unsigned short>::type_id == pData)     mState = State::ParamU16;
-        else if (TypeTraits<short>::type_id == pData)              mState = State::Param16;
-        else if (TypeTraits<unsigned int>::type_id == pData)       mState = State::ParamU32;
-        else if (TypeTraits<int>::type_id == pData)                mState = State::Param32;
-        else if (TypeTraits<unsigned long>::type_id == pData)      mState = State::ParamU32or34;
-        else if (TypeTraits<long>::type_id == pData)               mState = State::Param32or34;
-        else if (TypeTraits<unsigned long long>::type_id == pData) mState = State::ParamU64;
-        else if (TypeTraits<long long>::type_id == pData)          mState = State::Param64;
-        else if (TypeTraits<float>::type_id == pData)              mState = State::ParamFloat;
-        else if (TypeTraits<double>::type_id == pData)             mState = State::ParamDouble;
-        else if (TypeTraits<void*>::type_id == pData)              mState = State::ParamVoidP;
-        else if (TypeTraits<BufferLog>::type_id == pData)          mState = State::ParamBufferLogSz;
-        else if (TypeTraits<const char*>::type_id == pData)        mState = State::ParamStrSz;
+        if      (pData == TypeTraits<unsigned char>::type_id)      mState = State::ParamU8;
+        else if (pData == TypeTraits<signed char>::type_id)        mState = State::Param8;
+        else if (pData == TypeTraits<unsigned short>::type_id)     mState = State::ParamU16;
+        else if (pData == TypeTraits<short>::type_id)              mState = State::Param16;
+        else if (pData == TypeTraits<unsigned int>::type_id)       mState = State::ParamU32;
+        else if (pData == TypeTraits<int>::type_id)                mState = State::Param32;
+        else if (pData == TypeTraits<unsigned long>::type_id)      mState = State::ParamU32or34;
+        else if (pData == TypeTraits<long>::type_id)               mState = State::Param32or34;
+        else if (pData == TypeTraits<unsigned long long>::type_id) mState = State::ParamU64;
+        else if (pData == TypeTraits<long long>::type_id)          mState = State::Param64;
+        else if (pData == TypeTraits<float>::type_id)              mState = State::ParamFloat;
+        else if (pData == TypeTraits<double>::type_id)             mState = State::ParamDouble;
+        else if (pData == TypeTraits<void*>::type_id)              mState = State::ParamVoidP;
+        else if (pData == TypeTraits<BufferLog>::type_id)          mState = State::ParamBufferLogSz;
+        else if (pData == TypeTraits<const char*>::type_id)        mState = State::ParamStrSz;
         else
         {
             std::cout << mSs.str() << "\n";
@@ -253,29 +240,37 @@ private:
             throw std::runtime_error("LoggerRefXD not found in rodata");
     }
 
-    const char* findNextToken(char pTok, char pEsc, const char* pStr)
+    static const char* findNextToken(char pTok, std::string& tokenFormat, const char* pStr)
     {
-        // std::cout << "findNextToken: " << pStr << "\n";
-        while (true)
+        // std::cout << "findNextToken(" << pTok << " , [" << (uintptr_t) pStr << "] = " << *pStr << ")\n";
+        bool hasToken = false;
+        tokenFormat.clear();
+        tokenFormat.reserve(16);
+        const char* last = pStr;
+        while (*pStr)
         {
-            bool escape = false;
-            if (pEsc==*pStr)
+            if (hasToken)
             {
-                pStr++;
-                escape = true;
+                tokenFormat.push_back(*pStr);
             }
-            if (!*pStr)
+
+            if (hasToken && ' ' == *pStr)
             {
                 break;
             }
-            if (!escape && pTok==*pStr)
+
+            if (!hasToken && pTok==*pStr)
             {
-                break;
+                last = pStr;
+                hasToken = true;
+                tokenFormat.push_back(*pStr);
             }
             pStr++;
         }
-        return pStr;
+        // std::cout << "findNextToken = " << (uintptr_t)pStr << " format=\"" << tokenFormat << "\"\n";
+        return last;
     }
+
 
     std::array<std::function<void()>, size_t(State::N)> fn;
     std::vector<char> mRodata;
@@ -289,6 +284,8 @@ private:
     uint64_t mLogThread;
     BufferLog::first_type mBufferLogSz;
     std::stringstream mSs;
+    std::string tokenFormat;
+    char fmtbuf[128*128];
 };
 
 } //  spawner
