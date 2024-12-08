@@ -4,6 +4,8 @@
 
 constexpr auto NLOGS = 1000000;
 
+Logger logger("log.bin");
+
 void logtask(int div)
 {
     uint64_t timeBase = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now().time_since_epoch()).count();
@@ -11,8 +13,6 @@ void logtask(int div)
     double x = 1.23456789;
     float y = 1.23456789;
     uint64_t z = 99999999;
-
-    auto& logger = Logger::getInstance();
 
     for (auto i=0; i<logcount; i++)
     {
@@ -36,7 +36,6 @@ void runBM()
 {
     using namespace std::literals::chrono_literals;
 
-    auto& logger = Logger::getInstance();
     logger.logless();
 
     std::cout << "1 thread " << NLOGS << " logs:\n";
@@ -57,7 +56,6 @@ void runBM()
 
 int main()
 {
-    auto& logger = Logger::getInstance();
     logger.logful();
     uint8_t buff[] = {0xde,0xad,0xbe,0xef,0xca,0xfe};
     uint8_t buff2[] = {0xde,0xad,0xbe,0xef,0xde,0xca,0xf8,0xed,0xca,0xfe,0xde,0xad,0xbe,0xef,0xde,0xca,0xf8,0xed,0xca,0xfe};
@@ -78,5 +76,5 @@ int main()
 
     runBM();
 
-    Logger::getInstance().flush();
+    logger.flush();
 }
