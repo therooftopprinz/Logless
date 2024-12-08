@@ -284,7 +284,7 @@ struct LoglessTrace
         auto diff = now-mStart;
 
         Logless(mLogger, "TRACE LEAVE _ TIME _", mName, diff);
-        Logger::getInstance().flush();
+        mLogger.flush();
     }
     const char* mName;
     uint64_t mStart;
