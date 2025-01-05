@@ -76,7 +76,8 @@ public:
             logful_context_t ctx;
             uint8_t logbuff[4096*2];
             int flen = std::sprintf((char*)logbuff, "%lluus %llut ", (unsigned long long)pTime, (unsigned long long)pThread);
-            size_t sz = logful(ctx, logbuff + flen, id, ts...) + flen;
+            size_t sz = flen + 
+            logful(ctx, logbuff + flen, id, ts...);
             logbuff[sz++] = '\n';
             [[maybe_unused]] auto rv = ::write(1, logbuff, sz);
         }
@@ -114,7 +115,7 @@ public:
 
 private:
 
-    static const char* findNextToken(char pTok, std::string& tokenFormat, const char* pStr)
+    static const char* findNextToken(char openTok, char closeTok, std::string& tokenFormat, const char* pStr)
     {
         // std::cout << "findNextToken(" << pTok << " , [" << (uintptr_t) pStr << "] = " << *pStr << ")\n";
         bool hasToken = false;
@@ -123,22 +124,22 @@ private:
         const char* last = pStr;
         while (*pStr)
         {
+            if (hasToken && closeTok==*pStr)
+            {
+                break;
+            }
+
+            if (!hasToken && openTok==*pStr)
+            {
+                last = pStr;
+                hasToken = true;
+            }
+
             if (hasToken)
             {
                 tokenFormat.push_back(*pStr);
             }
 
-            if (hasToken && ' ' == *pStr)
-            {
-                break;
-            }
-
-            if (!hasToken && pTok==*pStr)
-            {
-                last = pStr;
-                hasToken = true;
-                tokenFormat.push_back(*pStr);
-            }
             pStr++;
         }
         // std::cout << "findNextToken = " << (uintptr_t)pStr << " format=\"" << tokenFormat << "\"\n";
@@ -147,71 +148,44 @@ private:
 
     size_t logful(logful_context_t& ctx, uint8_t* pOut, const char* pMsg)
     {
-        const char *nTok = findNextToken('%', ctx.tokenFormat, pMsg);
-        size_t sglen = uintptr_t(nTok)-uintptr_t(pMsg);
-        // std::cout << "logful(void) nTok=" << uintptr_t(nTok) << " sglen=" << sglen << "\n";
+        size_t sglen = strlen(pMsg);
         std::memcpy(pOut, pMsg, sglen);
         return sglen;
+    }
+
+    template<typename T>
+    size_t logful(logful_context_t& ctx, uint8_t*& pOut, const char*& pMsg, T t)
+    {
+        const char *nTok = findNextToken('%', ';', ctx.tokenFormat,pMsg);
+        size_t sglen = uintptr_t(nTok)-uintptr_t(pMsg);
+        std::memcpy(pOut, pMsg, sglen);
+        pMsg += sglen + ctx.tokenFormat.size() + 1;
+        pOut += sglen;
+        int flen = 0;
+        // std::cout << "logful(T) nTok=" << uintptr_t(nTok) << " sglen=" << sglen << "\n";
+
+        if (nTok)
+        {
+            if constexpr (!std::is_same_v<T, BufferLog>)
+            {
+                flen = std::sprintf((char*)pOut, ctx.tokenFormat.c_str(), t);
+                // std::cout << "token: " << "format: " << ctx.tokenFormat.c_str() <<  " value: " << t <<  " formatted: \"" << pOut << "\"\n";
+            }
+            else
+            {
+                auto s = toHexString((uint8_t*)t.second, t.first);
+                std::memcpy(pOut, s.data(), s.size());
+                flen += s.size();
+            }
+        }
+        if (flen>0) pOut += flen;
+        return sglen + flen;
     }
 
     template<typename T, typename... Ts>
     size_t logful(logful_context_t& ctx, uint8_t* pOut, const char* pMsg, T t, Ts... ts)
     {
-        const char *nTok = findNextToken('%', ctx.tokenFormat,pMsg);
-        size_t sglen = uintptr_t(nTok)-uintptr_t(pMsg);
-        std::memcpy(pOut, pMsg, sglen);
-        pMsg += sglen + ctx.tokenFormat.size();
-        pOut += sglen;
-        int flen = 0;
-        // std::cout << "logful(T) nTok=" << uintptr_t(nTok) << " sglen=" << sglen << "\n";
-        if (nTok)
-        {
-            flen = std::sprintf((char*)pOut, ctx.tokenFormat.c_str(), t);
-            // std::cout << "token: " << "format: " << ctx.tokenFormat.c_str() <<  " value: " << t <<  " formatted: \"" << pOut << "\"\n";
-        }
-        if (flen>0) pOut += flen;
-        return sglen + flen + logful(ctx, pOut, pMsg, ts...);
-    }
-
-    template<typename... Ts>
-    size_t logful(logful_context_t& ctx, uint8_t* pOut, const char* pMsg, BufferLog t, Ts... ts)
-    {
-        const char *nTok = findNextToken('%', ctx.tokenFormat, pMsg);
-        size_t sglen = uintptr_t(nTok)-uintptr_t(pMsg);
-        // std::cout << "logful(BL) nTok=" << uintptr_t(nTok) << " sglen=" << sglen << "\n";
-        std::memcpy(pOut, pMsg, sglen);
-        pMsg += sglen + ctx.tokenFormat.size();
-        pOut += sglen;
-        int flen = 0;
-        if (nTok)
-        {
-            auto s = toHexString((uint8_t*)t.second, t.first);
-            std::memcpy(pOut, s.data(), s.size());
-            flen += s.size();
-        }
-        if (flen>0) pOut += flen;
-        return sglen + flen + logful(ctx, pOut, pMsg, ts...);
-    }
-
-    template<typename... Ts>
-    size_t logful(logful_context_t& ctx, uint8_t* pOut, const char* pMsg, const char *t, Ts... ts)
-    {
-        const char *nTok = findNextToken('%', ctx.tokenFormat, pMsg);
-        size_t sglen = uintptr_t(nTok)-uintptr_t(pMsg);
-        // std::cout << "logful(cstr) nTok=" << uintptr_t(nTok) << " sglen=" << sglen << "\n";
-        std::memcpy(pOut, pMsg, sglen);
-        pMsg += sglen + ctx.tokenFormat.size();
-        pOut += sglen;
-        int flen = 0;
-        if (*nTok)
-        {
-            auto s = std::string_view(t, std::strlen(t));
-            std::memcpy(pOut, s.data(), s.size());
-            flen += s.size();
-            pMsg++;
-        }
-        if (flen>0) pOut += flen;
-        return sglen + flen + logful(ctx, pOut, pMsg, ts...);
+        return logful(ctx, pOut, pMsg, t) + logful(ctx, pOut, pMsg, ts...);
     }
 
     size_t logless(uint8_t* pUsedBuffer)

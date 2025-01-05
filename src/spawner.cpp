@@ -132,7 +132,7 @@ public:
     void decodeParam(tag pTag)
     {
         auto pData = pTag.data;
-        auto ntok = findNextToken('%', tokenFormat, mLogPoint);
+        auto ntok = findNextToken('%', ';', tokenFormat, mLogPoint);
         size_t sglen = uintptr_t(ntok)-uintptr_t(mLogPoint);
         std::string logSeg(mLogPoint, sglen);
 
@@ -140,7 +140,7 @@ public:
         // std::cout << "seg str:" << logSeg  << "\n";
 
         mSs << logSeg;
-        if (*ntok) mLogPoint = ntok + 1;
+        if (*ntok) mLogPoint = ntok + tokenFormat.size() + 1;
         if      (pData == TypeTraits<unsigned char>::type_id)      mState = State::ParamU8;
         else if (pData == TypeTraits<signed char>::type_id)        mState = State::Param8;
         else if (pData == TypeTraits<unsigned short>::type_id)     mState = State::ParamU16;
@@ -240,7 +240,7 @@ private:
             throw std::runtime_error("LoggerRefXD not found in rodata");
     }
 
-    static const char* findNextToken(char pTok, std::string& tokenFormat, const char* pStr)
+    static const char* findNextToken(char openTok, char closeTok, std::string& tokenFormat, const char* pStr)
     {
         // std::cout << "findNextToken(" << pTok << " , [" << (uintptr_t) pStr << "] = " << *pStr << ")\n";
         bool hasToken = false;
@@ -249,22 +249,22 @@ private:
         const char* last = pStr;
         while (*pStr)
         {
+            if (hasToken && closeTok==*pStr)
+            {
+                break;
+            }
+
+            if (!hasToken && openTok==*pStr)
+            {
+                last = pStr;
+                hasToken = true;
+            }
+
             if (hasToken)
             {
                 tokenFormat.push_back(*pStr);
             }
 
-            if (hasToken && ' ' == *pStr)
-            {
-                break;
-            }
-
-            if (!hasToken && pTok==*pStr)
-            {
-                last = pStr;
-                hasToken = true;
-                tokenFormat.push_back(*pStr);
-            }
             pStr++;
         }
         // std::cout << "findNextToken = " << (uintptr_t)pStr << " format=\"" << tokenFormat << "\"\n";

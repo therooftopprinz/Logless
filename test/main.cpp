@@ -16,10 +16,10 @@ void logtask(int div)
 
     for (auto i=0; i<logcount; i++)
     {
-        Logless(logger, "Hello logger: msg number %d here is a double %lf and here is a float %f and some 64 int %zu, "
-                                      "msg number %d here is a double %lf and here is a float %f and some 64 int %zu, "
-                                      "msg number %d here is a double %lf and here is a float %f and some 64 int %zu, "
-                                      "msg number %d here is a double %lf and here is a float %f and some 64 int %zu.",
+        Logless(logger, "Hello logger: msg number %d; here is a double %lf; and here is a float %f; and some 64 int %zu;, "
+                                      "msg number %d; here is a double %lf; and here is a float %f; and some 64 int %zu;, "
+                                      "msg number %d; here is a double %lf; and here is a float %f; and some 64 int %zu;, "
+                                      "msg number %d; here is a double %lf; and here is a float %f; and some 64 int %zu;.",
             i, x, y, z, i, x, y, z, i, x, y, z, i, x, y, z);
     }
 
@@ -60,19 +60,20 @@ int main()
     uint8_t buff[] = {0xde,0xad,0xbe,0xef,0xca,0xfe};
     uint8_t buff2[] = {0xde,0xad,0xbe,0xef,0xde,0xca,0xf8,0xed,0xca,0xfe,0xde,0xad,0xbe,0xef,0xde,0xca,0xf8,0xed,0xca,0xfe};
 
-    Logless(logger, "Log me pls %%", BufferLog(20, buff2));
-    Logless(logger, "Log me pls %c and %d and %x", int8_t('a'), int8_t('a'), int8_t('a'));
-    Logless(logger, "Log me pls %u", uint8_t('a'));
-    Logless(logger, "Log me pls %d", int16_t(0xffff));
-    Logless(logger, "Log me pls %u", uint16_t(0xffff));
-    Logless(logger, "Log me pls %d", int32_t(0xffffffff));
-    Logless(logger, "Log me pls %u", uint32_t(0xffffffff));
-    Logless(logger, "Log me pls %zd", int64_t(0xfffffffffffffffful));
-    Logless(logger, "Log me pls %zu", uint64_t(0xfffffffffffffffful));
-    Logless(logger, "Log me pls %f", float(4.2));
-    Logless(logger, "Log me pls %lf", double(4.2));
-    Logless(logger, "Log me pls %%", BufferLog(6, buff));
-    Logless(logger, "Log me pls %s", "this iz string");
+    Logless(logger, "Log me pls %%;", BufferLog(20, buff2));
+    Logless(logger, "Log me pls %c; and %d; and %x;", int8_t('a'), int8_t('a'), int8_t('a'));
+    Logless(logger, "Log me pl  %d; and %x;", int8_t('a'), int8_t('a'));
+    Logless(logger, "Log me pls %u;", uint8_t('a'));
+    Logless(logger, "Log me pls %d;", int16_t(0xffff));
+    Logless(logger, "Log me pls %u;", uint16_t(0xffff));
+    Logless(logger, "Log me pls %d;", int32_t(0xffffffff));
+    Logless(logger, "Log me pls %u;", uint32_t(0xffffffff));
+    Logless(logger, "Log me pls %zd;", int64_t(0xfffffffffffffffful));
+    Logless(logger, "Log me pls %zu;", uint64_t(0xfffffffffffffffful));
+    Logless(logger, "Log me pls %f;", float(4.2));
+    Logless(logger, "Log me pls %lf;", double(4.2));
+    Logless(logger, "Log me pls %%;", BufferLog(6, buff));
+    Logless(logger, "Log me pls %s;", "this iz string");
 
     runBM();
 
