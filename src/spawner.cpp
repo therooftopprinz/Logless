@@ -1,4 +1,4 @@
-#include <logless/Logger.hpp>
+#include <logless/logger.hpp>
 
 #include <string_view>
 #include <functional>
