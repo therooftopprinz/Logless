@@ -19,7 +19,7 @@
 #include <fcntl.h>
 #include <unistd.h>
 
-namespace spawner
+namespace logless
 {
 enum class State {
     Logpoint, Time, Thread, Tag,
@@ -107,9 +107,9 @@ public:
 
     void decodeParam(time)
     {
-        if (sizeof(Logger::TagType) + sizeof(uint64_t) == mReadSz)
+        if (sizeof(logger::tag_t) + sizeof(uint64_t) == mReadSz)
         {
-            std::memcpy(&mLogTime, mReadBuff + sizeof(Logger::TagType), sizeof(mLogTime));
+            std::memcpy(&mLogTime, mReadBuff + sizeof(logger::tag_t), sizeof(mLogTime));
             mState = State::Thread;
             mReadSz = 0;
             // std::cout << "state: Time: " << std::dec << mLogTime << "\n";
@@ -118,9 +118,9 @@ public:
 
     void decodeParam(thread)
     {
-        if (sizeof(Logger::TagType) + sizeof(uint64_t) == mReadSz)
+        if (sizeof(logger::tag_t) + sizeof(uint64_t) == mReadSz)
         {
-            std::memcpy(&mLogThread, mReadBuff + sizeof(Logger::TagType), sizeof(mLogThread));
+            std::memcpy(&mLogThread, mReadBuff + sizeof(logger::tag_t), sizeof(mLogThread));
             // std::cout << "state: Thread: " << std::dec << mLogThread << "\n";
             mSs << std::dec << mLogTime << "us ";
             mSs << std::hex << mLogThread << "t ";
@@ -141,21 +141,21 @@ public:
 
         mSs << logSeg;
         if (*ntok) mLogPoint = ntok + tokenFormat.size() + 1;
-        if      (pData == TypeTraits<unsigned char>::type_id)      mState = State::ParamU8;
-        else if (pData == TypeTraits<signed char>::type_id)        mState = State::Param8;
-        else if (pData == TypeTraits<unsigned short>::type_id)     mState = State::ParamU16;
-        else if (pData == TypeTraits<short>::type_id)              mState = State::Param16;
-        else if (pData == TypeTraits<unsigned int>::type_id)       mState = State::ParamU32;
-        else if (pData == TypeTraits<int>::type_id)                mState = State::Param32;
-        else if (pData == TypeTraits<unsigned long>::type_id)      mState = State::ParamU32or34;
-        else if (pData == TypeTraits<long>::type_id)               mState = State::Param32or34;
-        else if (pData == TypeTraits<unsigned long long>::type_id) mState = State::ParamU64;
-        else if (pData == TypeTraits<long long>::type_id)          mState = State::Param64;
-        else if (pData == TypeTraits<float>::type_id)              mState = State::ParamFloat;
-        else if (pData == TypeTraits<double>::type_id)             mState = State::ParamDouble;
-        else if (pData == TypeTraits<void*>::type_id)              mState = State::ParamVoidP;
-        else if (pData == TypeTraits<BufferLog>::type_id)          mState = State::ParamBufferLogSz;
-        else if (pData == TypeTraits<const char*>::type_id)        mState = State::ParamStrSz;
+        if      (pData == type_traits<unsigned char>::type_id)      mState = State::ParamU8;
+        else if (pData == type_traits<signed char>::type_id)        mState = State::Param8;
+        else if (pData == type_traits<unsigned short>::type_id)     mState = State::ParamU16;
+        else if (pData == type_traits<short>::type_id)              mState = State::Param16;
+        else if (pData == type_traits<unsigned int>::type_id)       mState = State::ParamU32;
+        else if (pData == type_traits<int>::type_id)                mState = State::Param32;
+        else if (pData == type_traits<unsigned long>::type_id)      mState = State::ParamU32or34;
+        else if (pData == type_traits<long>::type_id)               mState = State::Param32or34;
+        else if (pData == type_traits<unsigned long long>::type_id) mState = State::ParamU64;
+        else if (pData == type_traits<long long>::type_id)          mState = State::Param64;
+        else if (pData == type_traits<float>::type_id)              mState = State::ParamFloat;
+        else if (pData == type_traits<double>::type_id)             mState = State::ParamDouble;
+        else if (pData == type_traits<void*>::type_id)              mState = State::ParamVoidP;
+        else if (pData == type_traits<buffer_log_t>::type_id) mState = State::ParamBufferLogSz;
+        else if (pData == type_traits<const char*>::type_id)        mState = State::ParamStrSz;
         else
         {
             std::cout << mSs.str() << "\n";
@@ -171,9 +171,9 @@ public:
 
     void decodeParam(buffer)
     {
-        if (sizeof(BufferLog::first_type) == mReadSz)
+        if (sizeof(buffer_log_t::first_type) == mReadSz)
         {
-            BufferLog::first_type i;
+            buffer_log_t::first_type i;
             std::memcpy(&i, mReadBuff, sizeof(i));
             // std::cout << "state: ParamBufferLogSz: " << i << "\n";
             mBufferLogSz = i;
@@ -186,7 +186,7 @@ public:
     {
         if (mBufferLogSz == mReadSz)
         {
-            auto i = toHexString((uint8_t*)mReadBuff, mReadSz);
+            auto i = to_hex_str((uint8_t*)mReadBuff, mReadSz);
             // std::cout << "state: ParamBufferLogData: " << i << "\n";
             mSs << i;
             mState = State::Tag;
@@ -196,9 +196,9 @@ public:
 
     void decodeParam(string)
     {
-        if (sizeof(BufferLog::first_type) == mReadSz)
+        if (sizeof(buffer_log_t::first_type) == mReadSz)
         {
-            BufferLog::first_type i;
+            buffer_log_t::first_type i;
             std::memcpy(&i, mReadBuff, sizeof(i));
             // std::cout << "state: ParamStrSz: " << i << "\n";
             mBufferLogSz = i;
@@ -234,10 +234,10 @@ private:
     Spawner(std::vector<char>&& pRodata, std::integer_sequence<size_t, I...>)
         : fn({[this](){decodeParam(typename StateTraits<State(I)>::type());}...})
         , mRodata(std::move(pRodata))
-        , mRefPos(std::string_view((char*)mRodata.data(), mRodata.size()).find("LoggerRefXD"))
+        , mRefPos(std::string_view((char*)mRodata.data(), mRodata.size()).find("mV@it2+UNd$j*rHr=4&S6etGWQN1ub-Zaf2e,.n[mf@KQ3+aJMF?+4f).TwVPU2qKkB3nG/hZJ[D2)4L0?7ST!j{T]9{wF5[ePJg+_@5]Q$5SX2jX1,.P6hb[cTYMb]+"))
     {
         if (std::string_view::npos == mRefPos)
-            throw std::runtime_error("LoggerRefXD not found in rodata");
+            throw std::runtime_error("logger::g_ref not found in rodata");
     }
 
     static const char* findNextToken(char openTok, char closeTok, std::string& tokenFormat, const char* pStr)
@@ -282,26 +282,26 @@ private:
     const char* mLogPoint = nullptr;
     uint64_t mLogTime;
     uint64_t mLogThread;
-    BufferLog::first_type mBufferLogSz;
+    buffer_log_t::first_type mBufferLogSz;
     std::stringstream mSs;
     std::string tokenFormat;
     char fmtbuf[128*128];
 };
 
-} //  spawner
+} // namespace logless
 
 int main(int argc, const char* argv[])
 {
     std::vector<char> rodata;
     assert(argc == 4);
-    auto rodatefile  = fopen(argv[1], "r");
-    bool exitEof = std::string_view("exiteof")==argv[3];
-    char c;
+    auto rodatefile  = open(argv[1], O_RDONLY);
+    bool exit_eof = std::string_view("exiteof")==argv[3];
 
-    while (std::fread(&c, 1, 1, rodatefile)>0)
+    int c;
+    while (read(rodatefile, &c, 1) >0)
         rodata.push_back(c);
 
-    spawner::Spawner spawner(std::move(rodata));
+    logless::Spawner spawner(std::move(rodata));
 
     auto loglessfile = open(argv[2], O_RDONLY);
 
@@ -310,18 +310,24 @@ int main(int argc, const char* argv[])
         throw std::runtime_error("Failed to open log file!");
     }
     
-
+    char in[512];
     while (1)
     {
-        // int rd = std::fread(&c, 1, 1, loglessfile);
-        int rd = read(loglessfile, &c, 1);
+        int rd = read(loglessfile, &in, sizeof(in));
         if (0 < rd)
         {
-            spawner.in(c);
+            for (int i=0; i < rd; i++)
+            {
+                spawner.in(in[i]);
+            }
         }
         else if (0 == rd)
         {
-            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+            if (exit_eof)
+            {
+                printf("--exiteof--\n");
+                break;
+            }
             continue;
         }
         else

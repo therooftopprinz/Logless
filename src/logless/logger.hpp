@@ -1,6 +1,8 @@
 #ifndef __LOGGER_HPP__
 #define __LOGGER_HPP__
 
+#include <inttypes.h>
+#include <unistd.h>
 #include <iostream>
 #include <cstring>
 #include <fstream>
@@ -9,12 +11,15 @@
 #include <utility>
 #include <thread>
 #include <chrono>
+#include <atomic>
 
-#include <unistd.h>
 
-using BufferLog = std::pair<uint16_t, const void*>;
+namespace logless
+{
 
-inline std::string toHexString(const uint8_t* pData, size_t size)
+using buffer_log_t = std::pair<uint16_t, const void*>;
+
+inline std::string to_hex_str(const uint8_t* pData, size_t size)
 {
     std::stringstream ss;;
     for (size_t i=0; i<size; i++)
@@ -26,245 +31,296 @@ inline std::string toHexString(const uint8_t* pData, size_t size)
 }
 
 #define _ static constexpr
-template<typename>   struct TypeTraits;
-template<typename T> struct TypeTraits<T*>       {_ auto type_id = 0xad; _ size_t size =  sizeof(void*);              };
-template<> struct TypeTraits<unsigned char>      {_ auto type_id = 0xa1; _ size_t size =  sizeof(unsigned char);      };
-template<> struct TypeTraits<signed char>        {_ auto type_id = 0xa2; _ size_t size =  sizeof(signed char);        };
-template<> struct TypeTraits<unsigned short>     {_ auto type_id = 0xa3; _ size_t size =  sizeof(unsigned short);     };
-template<> struct TypeTraits<short>              {_ auto type_id = 0xa4; _ size_t size =  sizeof(short);              };
-template<> struct TypeTraits<unsigned int>       {_ auto type_id = 0xa5; _ size_t size =  sizeof(unsigned int);       };
-template<> struct TypeTraits<int>                {_ auto type_id = 0xa6; _ size_t size =  sizeof(int);                };
-template<> struct TypeTraits<unsigned long>      {_ auto type_id = 0xa7; _ size_t size =  sizeof(unsigned long);      };
-template<> struct TypeTraits<long>               {_ auto type_id = 0xa8; _ size_t size =  sizeof(long);               };
-template<> struct TypeTraits<unsigned long long> {_ auto type_id = 0xa9; _ size_t size =  sizeof(unsigned long long); };
-template<> struct TypeTraits<long long>          {_ auto type_id = 0xaa; _ size_t size =  sizeof(long long);          };
-template<> struct TypeTraits<float>              {_ auto type_id = 0xab; _ size_t size =  sizeof(float);              };
-template<> struct TypeTraits<double>             {_ auto type_id = 0xac; _ size_t size =  sizeof(double);             };
-template<> struct TypeTraits<BufferLog>          {_ auto type_id = 0xae; _ size_t size = 0;                           };
-template<> struct TypeTraits<const char*>        {_ auto type_id = 0xaf; _ size_t size = 0;                           };
-template<> struct TypeTraits<char*>              {_ auto type_id = 0xaf; _ size_t size = 0;                           };
+template<typename>   struct type_traits;
+template<typename T> struct type_traits<T*>       {_ auto type_id = 0xad; _ size_t size =  sizeof(void*);              };
+template<> struct type_traits<unsigned char>      {_ auto type_id = 0xa1; _ size_t size =  sizeof(unsigned char);      };
+template<> struct type_traits<signed char>        {_ auto type_id = 0xa2; _ size_t size =  sizeof(signed char);        };
+template<> struct type_traits<unsigned short>     {_ auto type_id = 0xa3; _ size_t size =  sizeof(unsigned short);     };
+template<> struct type_traits<short>              {_ auto type_id = 0xa4; _ size_t size =  sizeof(short);              };
+template<> struct type_traits<unsigned int>       {_ auto type_id = 0xa5; _ size_t size =  sizeof(unsigned int);       };
+template<> struct type_traits<int>                {_ auto type_id = 0xa6; _ size_t size =  sizeof(int);                };
+template<> struct type_traits<unsigned long>      {_ auto type_id = 0xa7; _ size_t size =  sizeof(unsigned long);      };
+template<> struct type_traits<long>               {_ auto type_id = 0xa8; _ size_t size =  sizeof(long);               };
+template<> struct type_traits<unsigned long long> {_ auto type_id = 0xa9; _ size_t size =  sizeof(unsigned long long); };
+template<> struct type_traits<long long>          {_ auto type_id = 0xaa; _ size_t size =  sizeof(long long);          };
+template<> struct type_traits<float>              {_ auto type_id = 0xab; _ size_t size =  sizeof(float);              };
+template<> struct type_traits<double>             {_ auto type_id = 0xac; _ size_t size =  sizeof(double);             };
+template<> struct type_traits<buffer_log_t>       {_ auto type_id = 0xae; _ size_t size = 0;                           };
+template<> struct type_traits<const char*>        {_ auto type_id = 0xaf; _ size_t size = 0;                           };
+template<> struct type_traits<char*>              {_ auto type_id = 0xaf; _ size_t size = 0;                           };
 #undef _
 
+constexpr uint64_t LOGALL  = 0;
+constexpr unsigned FATAL   = 0;
+constexpr unsigned ERROR   = 1;
+constexpr unsigned WARNING = 2;
+constexpr unsigned DEBUG   = 3;
+constexpr unsigned INFO    = 4;
+constexpr unsigned TRACE   = 4;
+
 template <typename... Ts>
-struct TotalSize
+struct total_sizer
 {
-    static constexpr size_t value = (TypeTraits<Ts>::size+...);
+    static constexpr size_t value = (type_traits<Ts>::size+...);
 };
 
 template<>
-struct TotalSize<>
+struct total_sizer<>
 {
     static constexpr size_t value = 0;
 };
 
-class Logger
+class logger
 {
 public:
     struct logful_context_t
     {
-        std::string tokenFormat;
+        std::string token_fmt;
     };
 
-    using HeaderType = int64_t;
-    using TagType    = uint8_t;
-    using TailType   = uint8_t;
-    template<typename... Ts>
-    void log(const char * id, uint64_t pTime, uint64_t pThread, const Ts&... ts)
+    using header_t = int64_t;
+    using tag_t    = uint8_t;
+    using tail_t   = uint8_t;
+
+    template<typename... ts>
+    void log(const char * id, uint64_t p_time, uint64_t p_thread, const ts&... ts_)
     {
-        if (mLogful)
+        if (m_logful)
         {
             logful_context_t ctx;
             uint8_t logbuff[4096*2];
-            int flen = std::sprintf((char*)logbuff, "%lluus %llut ", (unsigned long long)pTime, (unsigned long long)pThread);
+            int flen = std::sprintf((char*)logbuff, "%" PRIu64 " %" PRIu64 " ", p_time, p_thread);
             size_t sz = flen + 
-            logful(ctx, logbuff + flen, id, ts...);
+            logful(ctx, logbuff + flen, id, ts_...);
             logbuff[sz++] = '\n';
             [[maybe_unused]] auto rv = ::write(1, logbuff, sz);
         }
         {
             uint8_t buffer[2048];
-            uint8_t* usedBuffer = buffer;
-            new (usedBuffer) HeaderType(intptr_t(id)-intptr_t(LoggerRef));
-            usedBuffer += sizeof(HeaderType);
-            size_t sz = logless(usedBuffer, pTime, pThread, ts...) + sizeof(HeaderType);
-            std::fwrite((char*)buffer, 1, sz, mOutputFile);
+            uint8_t* used = buffer;
+            new (used) header_t(intptr_t(id)-intptr_t(g_ref));
+            used += sizeof(header_t);
+            size_t sz = logless(used, p_time, p_thread, ts_...) + sizeof(header_t);
+            std::fwrite((char*)buffer, 1, sz, m_output_file);
         }
     }
     void logful()
     {
-        mLogful = true;
+        m_logful = true;
     }
     void logless()
     {
-        mLogful = false;
+        m_logful = false;
     }
     void flush()
     {
-        std::fflush(mOutputFile);
+        std::fflush(m_output_file);
     }
 
-    Logger(const char* pFilename)
-        : mOutputFile(std::fopen(pFilename, "wb"))
+    logger(const char* p_filename)
+        : m_output_file(std::fopen(p_filename, "wb"))
     {
     }
 
-    ~Logger()
+    ~logger()
     {
-        std::fclose(mOutputFile);
+        std::fclose(m_output_file);
+    }
+
+    void set_level(unsigned level)
+    {
+        m_level = level;
+    }
+
+    unsigned get_level()
+    {
+        return m_level;
+    }
+
+    void set_logbit(uint64_t logbit)
+    {
+        m_logbit = logbit;
+    }
+
+    uint64_t get_logbit()
+    {
+        return m_logbit;
     }
 
 private:
 
-    static const char* findNextToken(char openTok, char closeTok, std::string& tokenFormat, const char* pStr)
+    static const char* find_next_token(char openTok, char close_tok, std::string& token_fmt, const char* pStr)
     {
-        // std::cout << "findNextToken(" << pTok << " , [" << (uintptr_t) pStr << "] = " << *pStr << ")\n";
-        bool hasToken = false;
-        tokenFormat.clear();
-        tokenFormat.reserve(16);
+        // std::cout << "find_next_token(" << pTok << " , [" << (uintptr_t) pStr << "] = " << *pStr << ")\n";
+        bool has_token = false;
+        token_fmt.clear();
+        token_fmt.reserve(16);
         const char* last = pStr;
         while (*pStr)
         {
-            if (hasToken && closeTok==*pStr)
+            if (has_token && close_tok==*pStr)
             {
                 break;
             }
 
-            if (!hasToken && openTok==*pStr)
+            if (!has_token && openTok==*pStr)
             {
                 last = pStr;
-                hasToken = true;
+                has_token = true;
             }
 
-            if (hasToken)
+            if (has_token)
             {
-                tokenFormat.push_back(*pStr);
+                token_fmt.push_back(*pStr);
             }
 
             pStr++;
         }
-        // std::cout << "findNextToken = " << (uintptr_t)pStr << " format=\"" << tokenFormat << "\"\n";
+        // std::cout << "find_next_token = " << (uintptr_t)pStr << " format=\"" << token_fmt << "\"\n";
         return last;
     }
 
-    size_t logful(logful_context_t& ctx, uint8_t* pOut, const char* pMsg)
+    size_t logful(logful_context_t& ctx, uint8_t* out, const char* msg)
     {
-        size_t sglen = strlen(pMsg);
-        std::memcpy(pOut, pMsg, sglen);
+        size_t sglen = strlen(msg);
+        std::memcpy(out, msg, sglen);
         return sglen;
     }
 
     template<typename T>
-    size_t logful(logful_context_t& ctx, uint8_t*& pOut, const char*& pMsg, T t)
+    size_t logful(logful_context_t& ctx, uint8_t*& out, const char*& msg, T t)
     {
-        const char *nTok = findNextToken('%', ';', ctx.tokenFormat,pMsg);
-        size_t sglen = uintptr_t(nTok)-uintptr_t(pMsg);
-        std::memcpy(pOut, pMsg, sglen);
-        pMsg += sglen + ctx.tokenFormat.size() + 1;
-        pOut += sglen;
+        const char *nTok = find_next_token('%', ';', ctx.token_fmt, msg);
+        size_t sglen = uintptr_t(nTok)-uintptr_t(msg);
+        std::memcpy(out, msg, sglen);
+        msg += sglen + ctx.token_fmt.size() + 1;
+        out += sglen;
         int flen = 0;
         // std::cout << "logful(T) nTok=" << uintptr_t(nTok) << " sglen=" << sglen << "\n";
 
         if (nTok)
         {
-            if constexpr (!std::is_same_v<T, BufferLog>)
+            if constexpr (!std::is_same_v<T, buffer_log_t>)
             {
-                flen = std::sprintf((char*)pOut, ctx.tokenFormat.c_str(), t);
-                // std::cout << "token: " << "format: " << ctx.tokenFormat.c_str() <<  " value: " << t <<  " formatted: \"" << pOut << "\"\n";
+                flen = std::sprintf((char*) out, ctx.token_fmt.c_str(), t);
+                // std::cout << "token: " << "format: " << ctx.token_fmt.c_str() <<  " value: " << t <<  " formatted: \"" << out << "\"\n";
             }
             else
             {
-                auto s = toHexString((uint8_t*)t.second, t.first);
-                std::memcpy(pOut, s.data(), s.size());
+                auto s = to_hex_str((uint8_t*) t.second, t.first);
+                std::memcpy(out, s.data(), s.size());
                 flen += s.size();
             }
         }
-        if (flen>0) pOut += flen;
+        if (flen>0) out += flen;
         return sglen + flen;
     }
 
     template<typename T, typename... Ts>
-    size_t logful(logful_context_t& ctx, uint8_t* pOut, const char* pMsg, T t, Ts... ts)
+    size_t logful(logful_context_t& ctx, uint8_t* out, const char* msg, T t, Ts... ts)
     {
-        return logful(ctx, pOut, pMsg, t) + logful(ctx, pOut, pMsg, ts...);
+        return logful(ctx, out, msg, t) + logful(ctx, out, msg, ts...);
     }
 
-    size_t logless(uint8_t* pUsedBuffer)
+    size_t logless(uint8_t* p_used)
     {
-        new (pUsedBuffer) TailType(0);
-        return sizeof(TailType);
+        new (p_used) tail_t(0);
+        return sizeof(tail_t);
     }
 
 
     template<typename T, typename... Ts>
-    size_t logless(uint8_t* pUsedBuffer, T t, Ts... ts)
+    size_t logless(uint8_t* p_used, T t, Ts... ts)
     {
-        new (pUsedBuffer) TagType(TypeTraits<T>::type_id);
-        pUsedBuffer += sizeof(TagType);
-        new (pUsedBuffer) T(t);
-        pUsedBuffer += sizeof(T);
-        return logless(pUsedBuffer, ts...) + sizeof(TagType) + sizeof(T);
+        new (p_used) tag_t(type_traits<T>::type_id);
+        p_used += sizeof(tag_t);
+        new (p_used) T(t);
+        p_used += sizeof(T);
+        return logless(p_used, ts...) + sizeof(tag_t) + sizeof(T);
     }
 
     template<typename... Ts>
-    size_t logless(uint8_t* pUsedBuffer, BufferLog t, Ts... ts)
+    size_t logless(uint8_t* p_used, buffer_log_t t, Ts... ts)
     {
-        new (pUsedBuffer) TagType(TypeTraits<BufferLog>::type_id);
-        pUsedBuffer += sizeof(TagType);
-        new (pUsedBuffer) BufferLog::first_type(t.first);
-        pUsedBuffer += sizeof(BufferLog::first_type);
-        std::memcpy(pUsedBuffer, t.second, t.first);
-        pUsedBuffer += t.first;
-        return logless(pUsedBuffer, ts...) + sizeof(TagType) + sizeof(BufferLog::first_type) + t.first;
+        new (p_used) tag_t(type_traits<buffer_log_t>::type_id);
+        p_used += sizeof(tag_t);
+
+        new (p_used) buffer_log_t::first_type(t.first);
+        p_used += sizeof(buffer_log_t::first_type);
+
+        std::memcpy(p_used, t.second, t.first);
+        p_used += t.first;
+
+        return logless(p_used, ts...) + sizeof(tag_t) + sizeof(buffer_log_t::first_type) + t.first;
     }
 
     template<typename... Ts>
-    size_t logless(uint8_t* pUsedBuffer, const char* t, Ts... ts)
+    size_t logless(uint8_t* p_used, const char* t, Ts... ts)
     {
-        new (pUsedBuffer) TagType(TypeTraits<const char*>::type_id);
-        pUsedBuffer += sizeof(TagType);
+        new (p_used) tag_t(type_traits<const char*>::type_id);
+        p_used += sizeof(tag_t);
+
         size_t tlen = strlen(t);
-        new (pUsedBuffer) BufferLog::first_type(tlen);
-        pUsedBuffer += sizeof(BufferLog::first_type);
-        std::memcpy(pUsedBuffer, t, tlen);
-        pUsedBuffer += tlen;
-        return logless(pUsedBuffer, ts...) + sizeof(TagType) + sizeof(BufferLog::first_type) + tlen;
+        new (p_used) buffer_log_t::first_type(tlen);
+        p_used += sizeof(buffer_log_t::first_type);
+
+        std::memcpy(p_used, t, tlen);
+        p_used += tlen;
+
+        return logless(p_used, ts...) + sizeof(tag_t) + sizeof(buffer_log_t::first_type) + tlen;
     }
 
-    std::FILE* mOutputFile;
-    bool mLogful = false;
-    static const char* LoggerRef;
+    std::FILE* m_output_file;
+    std::atomic<bool> m_logful = false;
+    static const char* g_ref;
+    std::atomic<unsigned> m_level = std::numeric_limits<unsigned>::max();
+    std::atomic<uint64_t> m_logbit = 0;
 };
 
 template <typename... Ts>
-void Logless(Logger& logger, const char* id, Ts... ts)
+void log(logger& logger, unsigned level, uint64_t bit, const char* id, Ts... ts)
 {
+    if (level > logger.get_level())
+    {
+        return;
+    }
+
+    if (bit && !(bit & logger.get_logbit()))
+    {
+        return;
+    }
+
     uint64_t timeNow = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now().time_since_epoch()).count();
     uint64_t threadId = std::hash<std::thread::id>()(std::this_thread::get_id());
     logger.log(id, timeNow, threadId, ts...);
 }
 
-struct LoglessTrace
+struct scope
 {
-    LoglessTrace(Logger& pLogger, const char* pName)
-        : mName(pName)
-        , mStart(std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now().time_since_epoch()).count())
-        , mLogger(pLogger)
+    scope(logger& p_logger, const char* p_name)
+        : m_name(p_name)
+        , m_start(std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now().time_since_epoch()).count())
+        , m_logger(p_logger)
     {
-        Logless(mLogger, "TRACE ENTER %s;", mName);
+        log(m_logger, TRACE, LOGALL, "SCOPE ENTER %s;", m_name);
     }
-    ~LoglessTrace()
+
+    ~scope()
     {
         auto now = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now().time_since_epoch()).count();
-        auto diff = now-mStart;
+        auto diff = now-m_start;
 
-        Logless(mLogger, "TRACE LEAVE %s; TIME %llu;", mName, diff);
-        mLogger.flush();
+        log(m_logger, TRACE, LOGALL, "SCOPE LEAVE %s; TIME %llu;", m_name, diff);
+        m_logger.flush();
     }
-    const char* mName;
-    uint64_t mStart;
-    Logger& mLogger;
+
+    const char* m_name;
+    uint64_t m_start;
+    logger& m_logger;
 };
 
-#define LOGLESS_TRACE(logger) LoglessTrace __trace(logger, __PRETTY_FUNCTION__)
+} // namespace loggless
+
+#define FUNCTION_TRACE(logger) logless::scope __trace(logger, __PRETTY_FUNCTION__)
 
 #endif // __LOGGER_HPP__
