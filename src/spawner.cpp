@@ -19,6 +19,8 @@
 #include <fcntl.h>
 #include <unistd.h>
 
+#define SPAWNERDEBUG if constexpr(false) std::cout
+
 namespace logless
 {
 enum class State {
@@ -85,7 +87,7 @@ public:
         {
             std::memcpy(&i, mReadBuff, sizeof(i));
             snprintf(fmtbuf, sizeof(fmtbuf), tokenFormat.c_str(), i);
-            // std::cout << "state: " << std::dec << unsigned(mState) << "format: " << tokenFormat.c_str() <<  " value: " << fmtbuf << "\n";
+            SPAWNERDEBUG << "state: " << std::dec << unsigned(mState) << "format: " << tokenFormat.c_str() <<  " value: " << fmtbuf << "\n";
             mSs << fmtbuf;
             mState = State::Tag;
             mReadSz = 0;
@@ -94,14 +96,14 @@ public:
 
     void decodeParam(logpoint)
     {
-        if (sizeof(uint64_t) == mReadSz)
+        if (sizeof(int64_t) == mReadSz)
         {
-            uint64_t i;
+            int64_t i;
             std::memcpy(&i, mReadBuff, sizeof(i));
             mLogPoint = mRodata.data() + mRefPos + i;
             mState = State::Time;
             mReadSz = 0;
-            // std::cout << "state: Logpoint@" << std::dec << i << ": " << mLogPoint << "\n";
+            SPAWNERDEBUG << "state: Logpoint@(rel=" << std::dec << i << " abs=" << (void*)(mRefPos+i) << "): " << mLogPoint << "\n";
         }
     }
 
@@ -112,7 +114,7 @@ public:
             std::memcpy(&mLogTime, mReadBuff + sizeof(logger::tag_t), sizeof(mLogTime));
             mState = State::Thread;
             mReadSz = 0;
-            // std::cout << "state: Time: " << std::dec << mLogTime << "\n";
+            SPAWNERDEBUG << "state: Time: " << std::dec << mLogTime << "\n";
         }
     }
 
@@ -121,9 +123,9 @@ public:
         if (sizeof(logger::tag_t) + sizeof(uint64_t) == mReadSz)
         {
             std::memcpy(&mLogThread, mReadBuff + sizeof(logger::tag_t), sizeof(mLogThread));
-            // std::cout << "state: Thread: " << std::dec << mLogThread << "\n";
+            SPAWNERDEBUG << "state: Thread: " << std::hex << "0x" << mLogThread << "\n";
             mSs << std::dec << mLogTime << "us ";
-            mSs << std::hex << mLogThread << "t ";
+            mSs << std::hex << "0x" << mLogThread << " ";
             mState = State::Tag;
             mReadSz = 0;
         }
@@ -133,11 +135,11 @@ public:
     {
         auto pData = pTag.data;
         auto ntok = findNextToken('%', ';', tokenFormat, mLogPoint);
-        size_t sglen = uintptr_t(ntok)-uintptr_t(mLogPoint);
-        std::string logSeg(mLogPoint, sglen);
+        size_t seg_len = uintptr_t(ntok)-uintptr_t(mLogPoint);
+        std::string logSeg(mLogPoint, seg_len);
 
-        // std::cout << "state: Tag: " << std::hex << std::setw(2) << std::setfill('0') << unsigned(pData) << "\n";
-        // std::cout << "seg str:" << logSeg  << "\n";
+        SPAWNERDEBUG << "log_segment: st[" << std::dec << seg_len << "]:" << logSeg  << "\n";
+        SPAWNERDEBUG << "state: Tag: 0x" << std::hex << std::setw(2) << std::setfill('0') << unsigned(pData) << "\n";
 
         mSs << logSeg;
         if (*ntok) mLogPoint = ntok + tokenFormat.size() + 1;
@@ -154,16 +156,12 @@ public:
         else if (pData == type_traits<float>::type_id)              mState = State::ParamFloat;
         else if (pData == type_traits<double>::type_id)             mState = State::ParamDouble;
         else if (pData == type_traits<void*>::type_id)              mState = State::ParamVoidP;
-        else if (pData == type_traits<buffer_log_t>::type_id) mState = State::ParamBufferLogSz;
+        else if (pData == type_traits<buffer_log_t>::type_id)       mState = State::ParamBufferLogSz;
         else if (pData == type_traits<const char*>::type_id)        mState = State::ParamStrSz;
         else
         {
             std::cout << mSs.str() << "\n";
-            // RTP TODO: Buggy in ARM gcc
-            // mSs = std::stringstream();
-            mSs.~basic_stringstream();
-            new (&mSs) std::stringstream();
-            // mSs.str("");
+            mSs = {};
             mState = State::Logpoint;
         }
         mReadSz = 0;
@@ -175,7 +173,7 @@ public:
         {
             buffer_log_t::first_type i;
             std::memcpy(&i, mReadBuff, sizeof(i));
-            // std::cout << "state: ParamBufferLogSz: " << i << "\n";
+            SPAWNERDEBUG << "state: ParamBufferLogSz: " << i << "\n";
             mBufferLogSz = i;
             mState = State::ParamBufferLogData;
             mReadSz = 0;
@@ -187,7 +185,7 @@ public:
         if (mBufferLogSz == mReadSz)
         {
             auto i = to_hex_str((uint8_t*)mReadBuff, mReadSz);
-            // std::cout << "state: ParamBufferLogData: " << i << "\n";
+            SPAWNERDEBUG << "state: ParamBufferLogData: " << i << "\n";
             mSs << i;
             mState = State::Tag;
             mReadSz = 0;
@@ -200,7 +198,7 @@ public:
         {
             buffer_log_t::first_type i;
             std::memcpy(&i, mReadBuff, sizeof(i));
-            // std::cout << "state: ParamStrSz: " << i << "\n";
+            SPAWNERDEBUG << "state: ParamStrSz: " << i << "\n";
             mBufferLogSz = i;
             mState = State::ParamStrData;
             mReadSz = 0;
@@ -212,7 +210,7 @@ public:
         if (mBufferLogSz == mReadSz)
         {
             std::string_view i(mReadBuff, mReadSz);
-            // std::cout << "state: ParamStrData: " << i << "\n";
+            SPAWNERDEBUG << "state: ParamStrData: " << i << "\n";
             mSs << i;
             mState = State::Tag;
             mReadSz = 0;
@@ -221,7 +219,7 @@ public:
 
     void in(uint8_t pData)
     {
-        // std::cout << "in[" << std::dec << std::setw(2) << std::setfill('0') << mReadSz << "]= " << std::hex << std::setw(2) << std::setfill('0') << unsigned(pData) << " " << pData << "\n";
+        SPAWNERDEBUG << "in[" << std::dec << std::setw(2) << std::setfill('0') << mReadSz << "]= " << std::hex << std::setw(2) << std::setfill('0') << unsigned(pData) << " " << pData << "\n";
         mReadBuff[mReadSz++] = pData;
         if (mState == State::Tag)
             return decodeParam((tag){pData});
@@ -238,11 +236,12 @@ private:
     {
         if (std::string_view::npos == mRefPos)
             throw std::runtime_error("logger::g_ref not found in rodata");
+        SPAWNERDEBUG << "ref_pos=" << mRefPos << "(" << (void*) mRefPos << ")\n";
     }
 
     static const char* findNextToken(char openTok, char closeTok, std::string& tokenFormat, const char* pStr)
     {
-        // std::cout << "findNextToken(" << pTok << " , [" << (uintptr_t) pStr << "] = " << *pStr << ")\n";
+        SPAWNERDEBUG << "findNextToken('" << openTok << "', '" << closeTok << "' , [" << (void*) pStr << "] = \"" << pStr << "\")\n";
         bool hasToken = false;
         tokenFormat.clear();
         tokenFormat.reserve(16);
@@ -267,10 +266,15 @@ private:
 
             pStr++;
         }
-        // std::cout << "findNextToken = " << (uintptr_t)pStr << " format=\"" << tokenFormat << "\"\n";
+
+        if (!*pStr)
+        {
+            last = pStr;
+        }
+
+        SPAWNERDEBUG << "findNextToken: [" << (void*)pStr << "]=\""<< pStr << "\" format=\"" << tokenFormat << "\" => \"" << last << "\"\n" ;
         return last;
     }
-
 
     std::array<std::function<void()>, size_t(State::N)> fn;
     std::vector<char> mRodata;

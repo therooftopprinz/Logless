@@ -69,17 +69,26 @@ int main()
     log(logger, DEBUG, LOGALL, "Log me pls %%;", buffer_log_t(20, buff2));
     log(logger, DEBUG, LOGALL, "Log me pls %c; and %d; and %x;", int8_t('a'), int8_t('a'), int8_t('a'));
     log(logger, DEBUG, LOGALL, "Log me pl  %d; and %x;", int8_t('a'), int8_t('a'));
-    log(logger, DEBUG, LOGALL, "Log me pls %u;", uint8_t('a'));
-    log(logger, DEBUG, LOGALL, "Log me pls %d;", int16_t(0xffff));
-    log(logger, DEBUG, LOGALL, "Log me pls %u;", uint16_t(0xffff));
-    log(logger, DEBUG, LOGALL, "Log me pls %d;", int32_t(0xffffffff));
-    log(logger, DEBUG, LOGALL, "Log me pls %u;", uint32_t(0xffffffff));
-    log(logger, DEBUG, LOGALL, "Log me pls %zd;", int64_t(0xfffffffffffffffful));
-    log(logger, DEBUG, LOGALL, "Log me pls %zu;", uint64_t(0xfffffffffffffffful));
-    log(logger, DEBUG, LOGALL, "Log me pls %f;", float(4.2));
-    log(logger, DEBUG, LOGALL, "Log me pls %lf;", double(4.2));
-    log(logger, DEBUG, LOGALL, "Log me pls %%;", buffer_log_t(6, buff));
-    log(logger, DEBUG, LOGALL, "Log me pls %s;", "this iz string");
+    log(logger, DEBUG, LOGALL, "Log me pls %u; ", uint8_t('a'));
+    log(logger, DEBUG, LOGALL, "Log me pls %d; ", int16_t(0xffff));
+    log(logger, DEBUG, LOGALL, "Log me pls %u; ", uint16_t(0xffff));
+    log(logger, DEBUG, LOGALL, "Log me pls %d; ", int32_t(0xffffffff));
+    log(logger, DEBUG, LOGALL, "Log me pls %u; ", uint32_t(0xffffffff));
+    log(logger, DEBUG, LOGALL, "Log me pls %zd; ", int64_t(0xfffffffffffffffful));
+    log(logger, DEBUG, LOGALL, "Log me pls %zu; ", uint64_t(0xfffffffffffffffful));
+    log(logger, DEBUG, LOGALL, "Log me pls %f; ", float(4.2));
+    log(logger, DEBUG, LOGALL, "Log me pls %lf; ", double(4.2));
+    log(logger, DEBUG, LOGALL, "Log me pls %%; whwhwhw", buffer_log_t(6, buff));
+    log(logger, DEBUG, LOGALL, "Log me pls %s; whwhwhw", "this iz string");
+    std::string address = "1.2.3.4";
+    log(logger, DEBUG, LOGALL, "bind_address=%s; error='%s;'", address.c_str(), "Cannot assign requested address");
+    log(logger, DEBUG, LOGALL, "simple");
+    log(logger, DEBUG, LOGALL, "bind_address=%s; asdasd", address.c_str());
+    log(logger, DEBUG, LOGALL, "bind_address=%s; error='%s;' asdasd", address.c_str(), strerror(EADDRNOTAVAIL));
+    log(logger, DEBUG, LOGALL, "error='%s;'", strerror(EADDRNOTAVAIL));
+    std::string sterr = "Cannot assign requested address";
+    log(logger, DEBUG, LOGALL, "bind_address=%s; error='%s;'", address.c_str(), sterr.c_str());
+    log(logger, DEBUG, LOGALL, "bind_address=%s; error='%s;' asd", address.c_str(), sterr.c_str());
 
     bm();
 

@@ -13,6 +13,8 @@
 #include <chrono>
 #include <atomic>
 
+#define LOGFULDEBUG  if constexpr(false) printf
+#define LOGLESSDEBUG if constexpr(false) printf
 
 namespace logless
 {
@@ -83,25 +85,39 @@ public:
     using tail_t   = uint8_t;
 
     template<typename... ts>
-    void log(const char * id, uint64_t p_time, uint64_t p_thread, const ts&... ts_)
+    void log(const char *id, uint64_t p_time, uint64_t p_thread, const ts&... ts_)
     {
+        {
+            uint8_t buffer[2048];
+            uint8_t* used = buffer;
+            auto log_point = intptr_t(id)-intptr_t(g_ref);
+            LOGLESSDEBUG("log_point=%zd format=\"%s\"\n", log_point, id);
+
+            new (used) header_t(log_point);
+            used += sizeof(header_t);
+            size_t sz = logless(used, p_time, p_thread, ts_...) + sizeof(header_t);
+            std::fwrite((char*)buffer, 1, sz, m_output_file);
+        }
         if (m_logful)
         {
             logful_context_t ctx;
             uint8_t logbuff[4096*2];
-            int flen = std::sprintf((char*)logbuff, "%" PRIu64 " %" PRIu64 " ", p_time, p_thread);
-            size_t sz = flen + 
-            logful(ctx, logbuff + flen, id, ts_...);
+            int flen = std::sprintf((char*)logbuff, "%" PRIu64 "us 0x%" PRIx64 " ", p_time, p_thread);
+            size_t sz = flen +
+                logful(ctx, logbuff + flen, id, ts_...);
+
+            LOGFULDEBUG("rem[%zu]=\"%s\"\n", strlen(id), id);
+
+            auto rem_id = strlen(id);
+            if (rem_id && sizeof(logbuff) > rem_id+sz)
+            {
+                strncpy((char*) logbuff+sz, id, rem_id);
+                sz += rem_id;
+            }
+
             logbuff[sz++] = '\n';
+
             [[maybe_unused]] auto rv = ::write(1, logbuff, sz);
-        }
-        {
-            uint8_t buffer[2048];
-            uint8_t* used = buffer;
-            new (used) header_t(intptr_t(id)-intptr_t(g_ref));
-            used += sizeof(header_t);
-            size_t sz = logless(used, p_time, p_thread, ts_...) + sizeof(header_t);
-            std::fwrite((char*)buffer, 1, sz, m_output_file);
         }
     }
     void logful()
@@ -149,61 +165,71 @@ public:
 
 private:
 
-    static const char* find_next_token(char openTok, char close_tok, std::string& token_fmt, const char* pStr)
+    static const char* find_next_token(char open_tok, char close_tok, std::string& token_fmt, const char* str)
     {
-        // std::cout << "find_next_token(" << pTok << " , [" << (uintptr_t) pStr << "] = " << *pStr << ")\n";
+        LOGFULDEBUG("find_next_token(\"%c\", \"%c\", ..., [%p]=\"%s\")\n", open_tok, close_tok, str, str);
+
         bool has_token = false;
         token_fmt.clear();
         token_fmt.reserve(16);
-        const char* last = pStr;
-        while (*pStr)
+        const char* last = str;
+        while (*str)
         {
-            if (has_token && close_tok==*pStr)
+            if (has_token && close_tok==*str)
             {
                 break;
             }
 
-            if (!has_token && openTok==*pStr)
+            if (!has_token && open_tok==*str)
             {
-                last = pStr;
+                last = str;
                 has_token = true;
             }
 
             if (has_token)
             {
-                token_fmt.push_back(*pStr);
+                token_fmt.push_back(*str);
             }
 
-            pStr++;
+            str++;
         }
-        // std::cout << "find_next_token = " << (uintptr_t)pStr << " format=\"" << token_fmt << "\"\n";
+
+        if (!*str)
+        {
+            last = str;
+        }
+
+        LOGFULDEBUG("find_next_token(..., ..., \"%s\", [%p]=\"%s\") => %s\n", token_fmt.c_str(), str, str, last);
+
         return last;
     }
 
     size_t logful(logful_context_t& ctx, uint8_t* out, const char* msg)
     {
-        size_t sglen = strlen(msg);
-        std::memcpy(out, msg, sglen);
-        return sglen;
+        return 0;
     }
 
     template<typename T>
     size_t logful(logful_context_t& ctx, uint8_t*& out, const char*& msg, T t)
     {
-        const char *nTok = find_next_token('%', ';', ctx.token_fmt, msg);
-        size_t sglen = uintptr_t(nTok)-uintptr_t(msg);
-        std::memcpy(out, msg, sglen);
-        msg += sglen + ctx.token_fmt.size() + 1;
-        out += sglen;
-        int flen = 0;
-        // std::cout << "logful(T) nTok=" << uintptr_t(nTok) << " sglen=" << sglen << "\n";
+        const char *n_tok = find_next_token('%', ';', ctx.token_fmt, msg);
+        size_t seg_len = uintptr_t(n_tok)-uintptr_t(msg);
 
-        if (nTok)
+        std::memcpy(out, msg, seg_len);
+
+        LOGFULDEBUG("logful<T>(): [%p]=\"%s\"\n", msg, std::string(msg, seg_len).c_str());
+
+        msg += seg_len + ctx.token_fmt.size() + 1;
+
+        out += seg_len;
+        int flen = 0;
+
+        if (*n_tok)
         {
             if constexpr (!std::is_same_v<T, buffer_log_t>)
             {
                 flen = std::sprintf((char*) out, ctx.token_fmt.c_str(), t);
-                // std::cout << "token: " << "format: " << ctx.token_fmt.c_str() <<  " value: " << t <<  " formatted: \"" << out << "\"\n";
+                LOGFULDEBUG("token: fmt_spec=\"%s\" value=\"%s\"\n", ctx.token_fmt.c_str(), out);
             }
             else
             {
@@ -212,29 +238,35 @@ private:
                 flen += s.size();
             }
         }
+
         if (flen>0) out += flen;
-        return sglen + flen;
+
+        return seg_len + flen;
     }
 
     template<typename T, typename... Ts>
-    size_t logful(logful_context_t& ctx, uint8_t* out, const char* msg, T t, Ts... ts)
+    size_t logful(logful_context_t& ctx, uint8_t* out, const char*& msg, T t, Ts... ts)
     {
         return logful(ctx, out, msg, t) + logful(ctx, out, msg, ts...);
     }
 
     size_t logless(uint8_t* p_used)
     {
+        LOGLESSDEBUG("tag=0x0\n");
         new (p_used) tail_t(0);
         return sizeof(tail_t);
     }
 
-
     template<typename T, typename... Ts>
     size_t logless(uint8_t* p_used, T t, Ts... ts)
     {
-        new (p_used) tag_t(type_traits<T>::type_id);
+        auto tag = type_traits<T>::type_id;
+        new (p_used) tag_t(tag);
         p_used += sizeof(tag_t);
         new (p_used) T(t);
+
+        LOGLESSDEBUG("tag=0x%x xsvalue=%s\n", tag, to_hex_str(p_used, sizeof(T)).c_str());
+
         p_used += sizeof(T);
         return logless(p_used, ts...) + sizeof(tag_t) + sizeof(T);
     }
@@ -242,12 +274,13 @@ private:
     template<typename... Ts>
     size_t logless(uint8_t* p_used, buffer_log_t t, Ts... ts)
     {
-        new (p_used) tag_t(type_traits<buffer_log_t>::type_id);
+        auto tag = type_traits<buffer_log_t>::type_id;
+        new (p_used) tag_t(tag);
         p_used += sizeof(tag_t);
 
         new (p_used) buffer_log_t::first_type(t.first);
         p_used += sizeof(buffer_log_t::first_type);
-
+        LOGLESSDEBUG("tag=0x%x xsvalue[%zu]=%s\n", tag, t.first, to_hex_str(t.second, t.first).c_str());
         std::memcpy(p_used, t.second, t.first);
         p_used += t.first;
 
@@ -257,10 +290,14 @@ private:
     template<typename... Ts>
     size_t logless(uint8_t* p_used, const char* t, Ts... ts)
     {
-        new (p_used) tag_t(type_traits<const char*>::type_id);
+        auto tag = type_traits<const char*>::type_id;
+        new (p_used) tag_t(tag);
         p_used += sizeof(tag_t);
 
         size_t tlen = strlen(t);
+
+        LOGLESSDEBUG("tag=0x%x svalue[%zu]=%s\n", tag, tlen, t);
+
         new (p_used) buffer_log_t::first_type(tlen);
         p_used += sizeof(buffer_log_t::first_type);
 
@@ -268,6 +305,12 @@ private:
         p_used += tlen;
 
         return logless(p_used, ts...) + sizeof(tag_t) + sizeof(buffer_log_t::first_type) + tlen;
+    }
+
+    template<typename... Ts>
+    size_t logless(uint8_t* p_used, char* t, Ts... ts)
+    {
+        return logless(p_used, (const char*) t, ts...);
     }
 
     std::FILE* m_output_file;
@@ -321,6 +364,7 @@ struct scope
 
 } // namespace loggless
 
+#undef LOGFULDEBUG
 #define FUNCTION_TRACE(logger) logless::scope __trace(logger, __PRETTY_FUNCTION__)
 
 #endif // __LOGGER_HPP__
