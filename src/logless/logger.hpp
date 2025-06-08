@@ -93,7 +93,8 @@ public:
             auto log_point = intptr_t(id)-intptr_t(g_ref);
             LOGLESSDEBUG("log_point=%zd format=\"%s\"\n", log_point, id);
 
-            new (used) header_t(log_point);
+            memcpy(used, &log_point, sizeof(log_point));
+
             used += sizeof(header_t);
             size_t sz = logless(used, p_time, p_thread, ts_...) + sizeof(header_t);
             std::fwrite((char*)buffer, 1, sz, m_output_file);
@@ -253,7 +254,8 @@ private:
     size_t logless(uint8_t* p_used)
     {
         LOGLESSDEBUG("tag=0x0\n");
-        new (p_used) tail_t(0);
+        tail_t t(0);
+        memcpy(p_used, &t, sizeof(t));
         return sizeof(tail_t);
     }
 
@@ -261,9 +263,9 @@ private:
     size_t logless(uint8_t* p_used, T t, Ts... ts)
     {
         auto tag = type_traits<T>::type_id;
-        new (p_used) tag_t(tag);
+        memcpy(p_used, &tag, sizeof(tag));
         p_used += sizeof(tag_t);
-        new (p_used) T(t);
+        memcpy(p_used, &t, sizeof(t));
 
         LOGLESSDEBUG("tag=0x%x xsvalue=%s\n", tag, to_hex_str(p_used, sizeof(T)).c_str());
 
@@ -275,11 +277,12 @@ private:
     size_t logless(uint8_t* p_used, buffer_log_t t, Ts... ts)
     {
         auto tag = type_traits<buffer_log_t>::type_id;
-        new (p_used) tag_t(tag);
+        memcpy(p_used, &tag, sizeof(tag));
         p_used += sizeof(tag_t);
 
-        new (p_used) buffer_log_t::first_type(t.first);
+        memcpy(p_used, &t.first, sizeof(t.first));
         p_used += sizeof(buffer_log_t::first_type);
+
         LOGLESSDEBUG("tag=0x%x xsvalue[%zu]=%s\n", tag, t.first, to_hex_str(t.second, t.first).c_str());
         std::memcpy(p_used, t.second, t.first);
         p_used += t.first;
@@ -291,14 +294,14 @@ private:
     size_t logless(uint8_t* p_used, const char* t, Ts... ts)
     {
         auto tag = type_traits<const char*>::type_id;
-        new (p_used) tag_t(tag);
+        memcpy(p_used, &tag, sizeof(tag));
         p_used += sizeof(tag_t);
 
         size_t tlen = strlen(t);
 
         LOGLESSDEBUG("tag=0x%x svalue[%zu]=%s\n", tag, tlen, t);
 
-        new (p_used) buffer_log_t::first_type(tlen);
+        memcpy(p_used, &tlen, sizeof(tlen));
         p_used += sizeof(buffer_log_t::first_type);
 
         std::memcpy(p_used, t, tlen);

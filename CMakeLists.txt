@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.15)
 
-project(logless VERSION 1.0.39 LANGUAGES CXX)
+project(logless VERSION 1.0.40 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
